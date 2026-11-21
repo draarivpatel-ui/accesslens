@@ -168,7 +168,11 @@ const now = new Date('2026-12-31T23:59:59Z');
 test('SM-2 first successful review schedules the next UTC day', () => assert.deepEqual(sm2(null, 5, now),
   {repetitions:1,interval:1,ease:2.6,due:'2027-01-01'}));
 test('SM-2 second successful interval is six days', () => assert.equal(sm2(sm2(null,5,now),5,now).interval,6));
-test('SM-2 later interval uses the previous ease', () => assert.equal(sm2({repetitions:2,interval:6,ease:2.5},5,now).interval,15));
+test('SM-2 later interval uses the updated ease', () => assert.equal(sm2({repetitions:2,interval:6,ease:2.5},5,now).interval,16));
+test('SM-2 malformed prior state falls back to defaults', () => {
+  assert.deepEqual(sm2({repetitions: 'two', interval: NaN, ease: undefined}, 5, now), {repetitions: 1, interval: 1, ease: 2.6, due: '2027-01-01'});
+  assert.deepEqual(sm2({repetitions: 5}, 5, now), {repetitions: 6, interval: 1, ease: 2.6, due: '2027-01-01'});
+});
 test('SM-2 a lapse resets repetitions and interval', () => assert.deepEqual(sm2({repetitions:4,interval:12,ease:1.3},0,now),
   {repetitions:0,interval:1,ease:1.3,due:'2027-01-01'}));
 for (const grade of [-1, 6, 2.5, '5', NaN]) test(`SM-2 rejects invalid grade ${String(grade)}`, () => assert.throws(() => sm2(null, grade, now),RangeError));
@@ -206,4 +210,41 @@ test('UI uses a restrictive CSP before script and stylesheet references', async 
   assert.match(source, /require-trusted-types-for 'script'/);
   assert.ok(source.indexOf('Content-Security-Policy') < source.indexOf('<script'));
   assert.doesNotMatch(source, /(?:href|src)="https?:\/\//);
+});
+
+test('anki TSV rows can never become directives', () => {
+  const out = ankiTSV([{front: '#deck:evil', back: '#tags:spam', sourceStart: 0, sourceEnd: 5}]);
+  const lines = out.trimEnd().split('\n');
+  assert.equal(lines.length, 4);
+  assert.match(lines[3], /^ #deck:evil\t #tags:spam/);
+});
+
+test('anki fields strip all control and separator characters', () => {
+  const out = ankiTSV([{front: 'a\u000bb\u000cc\u2029d', back: 'ok', sourceStart: 0, sourceEnd: 1}]);
+  assert.ok(out.includes('a b c d\tok'));
+});
+
+test('anki source citations are sanitized like the fields', () => {
+  const out = ankiTSV([{front: 'a', back: 'b', sourceStart: '0\tINJECT', sourceEnd: '2\nev#il'}]);
+  assert.ok(out.includes('Source [0 INJECT, 2 ev#il)'));
+});
+
+test('CSV formula guard catches invisible format prefixes', () => {
+  const out = reviewCSV([{front: '\u200b=cmd', back: 'x', sourceStart: 0, sourceEnd: 1}], null);
+  assert.ok(out.includes(`"'${'\u200b'}=cmd"`), out);
+  const nb = reviewCSV([{front: '\u00a0\u0009=x', back: 'x', sourceStart: 0, sourceEnd: 1}], null);
+  assert.ok(nb.includes(`"'${'\u00a0'}${'\u0009'}=x"`), nb);
+});
+
+test('canonical JSON mirrors BigInt and Symbol wrapper behavior', () => {
+  assert.throws(() => canonicalJSON(Object(10n)), TypeError);
+  assert.equal(canonicalJSON({a: Object(Symbol('x')), b: 2}), '{"b":2}');
+  assert.equal(canonicalJSON({a: Object(3), b: Object('s'), c: Object(true)}), '{"a":3,"b":"s","c":true}');
+});
+
+test('shortcut guard covers ARIA text-entry and menu roles', () => {
+  for (const role of ['searchbox', 'gridcell', 'option', 'menuitem', 'treeitem']) {
+    const event = { key: 'r', target: { isContentEditable: false, closest: sel => sel.includes(role) ? {} : null } };
+    assert.equal(shortcutAction(event, true), null, role);
+  }
 });

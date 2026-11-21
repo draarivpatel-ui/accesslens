@@ -1,8 +1,8 @@
 import { words } from './nlp.js';
 
 export function sourceSpan(map, start, end) {
-  if (start === end || !map) return { sourceStart: start, sourceEnd: end };
-  return { sourceStart: map.starts[start] ?? 0, sourceEnd: map.ends[end - 1] ?? 0 };
+  if (start === end || !map || start < 0 || end > map.starts.length || end <= start) return { sourceStart: start, sourceEnd: end };
+  return { sourceStart: map.starts[start], sourceEnd: map.ends[end - 1] };
 }
 
 export function makeCards(ranked, terms, map) {
@@ -14,7 +14,7 @@ export function makeCards(ranked, terms, map) {
     if (tokens.length < 4) continue;
     const inLine = terms.filter(term => term.start >= line.start && term.end <= line.end);
     const term = inLine.find(t => t.explanation && !used.has(t.text.toLowerCase()));
-    const anchor = term ?? [...tokens].filter(w => w.text.length >= 4 && !/^\d+$/.test(w.text))
+    const anchor = term ?? [...tokens].filter(w => w.text.length >= 4 && !/^[\d.,:'’-]+$/.test(w.text))
       .sort((a, b) => b.text.length - a.text.length || a.start - b.start)[0];
     if (!anchor) continue;
     const offset = term ? term.start - line.start : anchor.start;
@@ -34,10 +34,15 @@ export function makeCards(ranked, terms, map) {
 
 export function sm2(prior, grade, now = new Date()) {
   if (!Number.isInteger(grade) || grade < 0 || grade > 5) throw new RangeError('Rate the card from 0 to 5.');
-  const state = prior ?? { repetitions: 0, interval: 0, ease: 2.5 };
+  const src = prior && typeof prior === 'object' ? prior : {};
+  const state = {
+    repetitions: Number.isInteger(src.repetitions) && src.repetitions >= 0 ? src.repetitions : 0,
+    interval: Number.isFinite(src.interval) && src.interval >= 0 ? src.interval : 0,
+    ease: Number.isFinite(src.ease) ? Math.max(1.3, src.ease) : 2.5
+  };
   const ease = Math.max(1.3, state.ease + 0.1 - (5 - grade) * (0.08 + (5 - grade) * 0.02));
   const repetitions = grade < 3 ? 0 : state.repetitions + 1;
-  const interval = repetitions <= 1 ? 1 : repetitions === 2 ? 6 : Math.max(1, Math.round(state.interval * state.ease));
+  const interval = repetitions <= 1 ? 1 : repetitions === 2 ? 6 : Math.max(1, Math.round(state.interval * ease));
   const date = new Date(now);
   date.setUTCDate(date.getUTCDate() + interval);
   return { repetitions, interval, ease, due: date.toISOString().slice(0, 10) };

@@ -8,7 +8,10 @@ const ENTITIES = {
   amp: '&', apos: "'", quot: '"', lt: '<', gt: '>', nbsp: ' ', ensp: ' ', emsp: ' ',
   ndash: '\u2013', mdash: '\u2014', lsquo: '\u2018', rsquo: '\u2019', ldquo: '\u201c', rdquo: '\u201d',
   bull: '\u2022', hellip: '\u2026', copy: '\u00a9', reg: '\u00ae', eacute: '\u00e9', euro: '\u20ac',
-  pound: '\u00a3', cent: '\u00a2', times: '\u00d7', divide: '\u00f7', Tab: '\t', NewLine: '\n'
+  pound: '\u00a3', cent: '\u00a2', times: '\u00d7', divide: '\u00f7', Tab: '\t', NewLine: '\n',
+  LT: '<', GT: '>', colon: ':', sol: '/', equals: '=', lpar: '(', rpar: ')', period: '.', comma: ',',
+  semi: ';', num: '#', dollar: '$', percnt: '%', ast: '*', plus: '+', excl: '!', quest: '?', at: '@',
+  lsqb: '[', rsqb: ']', lcub: '{', rcub: '}', verbar: '|', bsol: '\\', hat: '^', grave: '`', lowbar: '_'
 };
 const MAX_DEPTH = 96;
 
@@ -30,7 +33,7 @@ function readTag(source, start) {
   const open = tagStart.exec(source);
   if (!open) return null;
   let p = tagStart.lastIndex;
-  const limit = Math.min(source.length, start + 4096);
+  const limit = source.length;
   const attrs = Object.create(null);
   const spans = Object.create(null);
   while (p < limit) {
@@ -79,12 +82,14 @@ export function tokenizeHTML(source) {
     const value = source.slice(start, end);
     if (raw && node.tag !== 'title' && node.tag !== 'textarea') return;
     const decoded = decodeEntities(value);
+    const svgTitle = node?.tag === 'title' && node.parent?.tag === 'svg';
     for (let i = stack.length - 1; i >= 0; i--) {
       const ancestor = stack[i];
-      if (LABEL_TEXT.test(ancestor.tag) && ancestor.label.length < 2048 &&
-          (!node?.hidden || ancestor.tag === 'title' || !ancestor.hidden && node === ancestor)) ancestor.label += decoded.slice(0, 2048);
+      if (LABEL_TEXT.test(ancestor.tag) && ancestor.label.length < 2048 && !node?.aria &&
+          (!node?.hidden || ancestor.tag === 'title' || svgTitle && !ancestor.hidden || !ancestor.hidden && node === ancestor))
+        ancestor.label += decoded.slice(0, 2048 - ancestor.label.length);
     }
-    if (!node?.hidden && !raw) events.push({ type: 'text', node, start, end, value });
+    if (!raw) events.push({ type: 'text', node, start, end, value, hidden: Boolean(node?.hidden), aria: Boolean(node?.aria), pre: stack.some(n => n.tag === 'pre') });
   }
   const next = /</g;
   let p = 0;
@@ -95,8 +100,13 @@ export function tokenizeHTML(source) {
     addText(p, at);
     if (at === source.length) break;
     if (source.startsWith('<!--', at)) {
-      const end = source.indexOf('-->', at + 4);
-      p = end < 0 ? source.length : end + 3;
+      const body = at + 4;
+      if (source[body] === '>') { p = body + 1; continue; }
+      if (source.startsWith('->', body)) { p = body + 2; continue; }
+      const normal = source.indexOf('-->', body);
+      const bang = source.indexOf('--!>', body);
+      const end = normal < 0 ? bang : bang < 0 ? normal : Math.min(normal, bang);
+      p = end < 0 ? source.length : end + (source.startsWith('--!>', end) ? 4 : 3);
       continue;
     }
     if (source.startsWith('<!', at) || source.startsWith('<?', at)) {
@@ -114,6 +124,10 @@ export function tokenizeHTML(source) {
     p = token.end;
     const { tag, close, attrs } = token;
     if (close) {
+      if (tag === 'br') {
+        if (!stack.at(-1)?.hidden) events.push({type: 'break', start: token.start, end: p});
+        continue;
+      }
       for (let i = stack.length - 1; i >= 0; i--) {
         if (stack[i].tag !== tag) continue;
         if (BLOCK.has(tag) && !stack[i].hidden) events.push({type: 'break', start: token.start, end: p});
@@ -124,26 +138,32 @@ export function tokenizeHTML(source) {
     }
     if (stack.at(-1)?.tag === tag && AUTOCLOSE.has(tag)) stack.pop();
     if (BLOCK.has(tag) && stack.at(-1)?.tag === 'p') stack.pop();
+    if (tag === 'a') { const open = stack.findLastIndex(n => n.tag === 'a'); if (open >= 0) stack.length = open; }
     const parent = stack.at(-1);
     const ownHidden = Object.hasOwn(attrs, 'hidden') || /(?:^|;)\s*(?:display\s*:\s*none|visibility\s*:\s*hidden)\b/i.test(attrs.style ?? '');
     const node = { ...token, parent, label: '', hidden: Boolean(parent?.hidden || ownHidden || HIDDEN.has(tag)),
-      excluded: Boolean(parent?.hidden || ownHidden) };
+      excluded: Boolean(parent?.hidden || ownHidden), aria: Boolean(parent?.aria || attrs['aria-hidden']?.trim().toLowerCase() === 'true') };
     elements.push(node);
     if (BLOCK.has(tag) && !node.hidden) events.push({type: 'break', start: at, end: p});
     if (tag === 'img' && !node.hidden && attrs.alt?.trim()) {
       const [start, end] = token.spans.alt;
-      events.push({type: 'alt', node, start, end, value: attrs.alt});
+      events.push({type: 'alt', node, start, end, value: attrs.alt, aria: node.aria});
       for (const ancestor of stack) {
-        if (LABEL_TEXT.test(ancestor.tag) && ancestor.label.length < 2048) ancestor.label += ' ' + attrs.alt;
+        if (LABEL_TEXT.test(ancestor.tag) && ancestor.label.length < 2048 && !node.aria)
+          ancestor.label += (' ' + attrs.alt).slice(0, Math.max(0, 2048 - ancestor.label.length));
       }
     }
-    if (tag === 'plaintext') break;
+    if (tag === 'plaintext') { addText(p, source.length); break; }
     if (RAW.has(tag)) {
       const closing = new RegExp(`</${tag}(?=[\\s/>])[^>]*>`, 'ig');
       closing.lastIndex = p;
       const end = closing.exec(source);
       stack.push(node);
       addText(p, end?.index ?? source.length, true);
+      if ((tag === 'textarea' || tag === 'xmp') && !node.excluded) {
+        const stop = end?.index ?? source.length;
+        events.push({type: 'text', node, start: p, end: stop, value: source.slice(p, stop), hidden: false, aria: node.aria, pre: tag === 'xmp'});
+      }
       stack.pop();
       p = end ? closing.lastIndex : source.length;
     } else if (!VOID.has(tag)) {
@@ -157,9 +177,12 @@ export function tokenizeHTML(source) {
 export function extractHTML(parsed) {
   const chars = [], starts = [], ends = [], blocks = [];
   let owner, blockStart = 0, pending = null;
-  function emit(value, start, end) {
+  function emit(value, start, end, pre = false) {
     for (const char of value.split('')) {
-      if (/\s/u.test(char)) { pending ??= [start, end]; continue; }
+      if (/\s/u.test(char)) {
+        if (pre) { pending = null; chars.push(char); starts.push(start); ends.push(end); continue; }
+        pending ??= [start, end]; continue;
+      }
       if (pending && chars.length && chars.at(-1) !== '\n') {
         chars.push(' '); starts.push(pending[0]); ends.push(pending[1]);
       }
@@ -180,6 +203,7 @@ export function extractHTML(parsed) {
   }
   for (const item of parsed.events) {
     if (item.type === 'break') { flush(item); continue; }
+    if (item.hidden) continue;
     let nextOwner = item.node;
     while (nextOwner && !BLOCK.has(nextOwner.tag)) nextOwner = nextOwner.parent;
     if (owner !== nextOwner && chars.length > blockStart) flush(item);
@@ -192,14 +216,14 @@ export function extractHTML(parsed) {
     }
     let offset = 0;
     for (const match of item.value.matchAll(entityPattern)) {
-      for (; offset < match.index; offset++) emit(item.value[offset], item.start + offset, item.start + offset + 1);
+      for (; offset < match.index; offset++) emit(item.value[offset], item.start + offset, item.start + offset + 1, item.pre);
       const stop = match.index + match[0].length;
       const decoded = entity(match[0]);
       if (decoded === match[0]) continue;
-      emit(decoded, item.start + offset, item.start + stop);
+      emit(decoded, item.start + offset, item.start + stop, item.pre);
       offset = stop;
     }
-    for (; offset < item.value.length; offset++) emit(item.value[offset], item.start + offset, item.start + offset + 1);
+    for (; offset < item.value.length; offset++) emit(item.value[offset], item.start + offset, item.start + offset + 1, item.pre);
   }
   flush({start: 0, end: 0});
   if (chars.at(-1) === '\n') { chars.pop(); starts.pop(); ends.pop(); }

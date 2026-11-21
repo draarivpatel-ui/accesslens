@@ -26,7 +26,9 @@ for (const [source, expected] of [
 for (const [word, expected] of [
   ['cat',1], ['science',2], ['education',4], ['every',2], ['people',2], ['queue',1], ['little',2], ['hour',1],
   ['business',2], ['quiet',2], ['area',3], ['recipe',3], ['makes',1], ['boxes',2], ['wanted',2], ['part-time',2],
-  ['FAFSA',5], ['WCAG',5], ['7',1], ['1234',1]
+  ['FAFSA',2], ['NASA',2], ['STEM',1], ['WCAG',5], ['RSVP',4], ['7',1], ['1234',1],
+  ['coffee',2], ['agree',2], ['degree',2], ['cookie',2], ['rescue',2], ['argue',2], ['cafe',2], ['naive',2],
+  ['vague',1], ['league',1], ['dialogue',3], ['unique',2], ['free',1], ['tree',1], ['blue',1], ['shoe',1]
 ]) test(`syllables ${word}`, () => assert.equal(syllables(word), expected));
 
 test('word offsets are UTF-16 and preserve hyphens, apostrophes and accents', () => {
@@ -37,7 +39,8 @@ test('word offsets are UTF-16 and preserve hyphens, apostrophes and accents', ()
   for (const t of tokens) assert.equal(source.slice(t.start, t.end), t.text);
 });
 
-test('FK formula separately computed for a single word', () => near(readability('Cat.').fk, .39 + 11.8 - 15.59));
+test('FK formula separately computed for a single word', () => near(readability('The cat sat on the mat today.').fk, .39 * 7 + 11.8 * 8 / 7 - 15.59));
+test('FK grade never reports below zero', () => assert.equal(readability('Cat.').fk, 0));
 test('FK grade uses words per sentence and syllables per word', () => {
   const result = readability('Cat sat. Education helps.');
   assert.deepEqual([result.words, result.sentences, result.syllables], [4, 2, 7]);
@@ -142,4 +145,75 @@ for (const {id, lines} of rankCases) test(`ranking retains source and normalized
   assert.equal(result.ranked.length, lines.length);
   near(result.ranked.reduce((sum, r) => sum + r.score, 0), 1);
   for (const item of result.ranked) assert.equal(text.slice(item.start, item.end), lines[item.index]);
+});
+
+test('unlisted abbreviations keep the sentence whole', () => {
+  for (const source of [
+    'See Fig. 3 for details.', 'See Eq. 2 and approx. 5 pages now.', 'The answer is in Eq. 4, not Eq. 5.',
+    'She visited St. Louis last year.', 'He joined the U.S. Army last year.', 'Smith et al. found the effect.',
+    'Due Jan. 5 at the latest.', 'Meet at 9 a.m. in the lab.', 'Example, e.g. a cup. Good.'])
+    assert.equal(sentences(source).length <= 2, true, source);
+  assert.deepEqual(sentences('See Fig. 3 for details.').map(s => s.text), ['See Fig. 3 for details.']);
+});
+
+test('abbreviations do not suppress real sentence ends', () => {
+  for (const source of [
+    'Bring pens, paper, etc. Then wash your hands.', 'Meet at 9 a.m. Everyone should come.',
+    'She lives on Main St. Next week we visit.', 'He moved to the U.S. Then he left.',
+    'The meeting is at 5 p.m. Please bring a pen.']) {
+    const parts = sentences(source).map(s => s.text);
+    assert.equal(parts.length, 2, source);
+    assert.equal(parts[0][0] === parts[0][0].toUpperCase() && parts[1][0] === parts[1][0].toUpperCase(), true, source);
+  }
+});
+
+test('single initials split only before real sentence starts', () => {
+  assert.equal(sentences('Plan A. The team reviewed it.').length, 2);
+  assert.equal(sentences('I saw A. It was red.').length, 2);
+  assert.deepEqual(sentences('Prof. X. arrived late.').map(s => s.text), ['Prof. X. arrived late.']);
+  assert.equal(sentences('A. Patel read it.').length, 1);
+});
+
+test('more line separators end sentences', () => {
+  assert.equal(sentences('one\rtwo').length, 2);
+  assert.equal(sentences('one\vtwo').length, 2);
+  assert.equal(sentences('one\ftwo').length, 2);
+  assert.equal(sentences('one\u2028two').length, 2);
+  assert.equal(sentences('one\u2029two').length, 2);
+});
+
+test('numbers with separators and underscore names are single words', () => {
+  assert.deepEqual(words('Use 1.5 mL and 1,000 cells.').map(w => w.text), ['Use', '1.5', 'mL', 'and', '1,000', 'cells']);
+  assert.deepEqual(words('version 2.0.1 ships').map(w => w.text), ['version', '2.0.1', 'ships']);
+  assert.deepEqual(words('Meet at 3:30 sharp.').map(w => w.text), ['Meet', 'at', '3:30', 'sharp']);
+  assert.deepEqual(words('snake_case works').map(w => w.text), ['snake_case', 'works']);
+});
+
+test('dotted acronyms stay whole and resolve to names', () => {
+  assert.deepEqual(words('the U.S. team met').map(w => w.text), ['the', 'U.S.', 'team', 'met']);
+  assert.equal(syllables('U.S.'), 2);
+  const terms = detectTerms('the U.S. team met');
+  assert.equal(terms.length, 1);
+  assert.equal(terms[0].kind, 'acronym');
+  assert.equal(terms[0].explanation, 'United States');
+});
+
+test('passive detector catches comma and adverb chains plus irregular participles', () => {
+  for (const source of ['The sample was very carefully labeled.', 'He was born in June.',
+      'She got fired.', 'It was, however, reviewed.', 'The data was only partially recorded.'])
+    assert.equal(detectPassive(source).length, 1, source);
+});
+
+test('passive detector skips nouns and participial adjectives', () => {
+  for (const source of ['The coat was tweed.', 'The motive was greed.', 'I am done.',
+      'The team was annoyed.', 'She was delighted.', 'It is a good day.'])
+    assert.equal(detectPassive(source).length, 0, source);
+  assert.equal(detectPassive('They were elected officials.').length, 1);
+});
+
+test('split suggestion never emits a space before the inserted period', () => {
+  const long = 'Alpha beta gamma delta epsilon zeta eta theta ; then iota kappa lambda mu nu xi omicron pi rho sigma tau upsilon phi chi psi omega';
+  const parts = splitLongSentence(long);
+  assert.ok(parts);
+  assert.ok(parts[0].endsWith('.') && !parts[0].endsWith(' .'), parts[0]);
 });

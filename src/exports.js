@@ -2,7 +2,7 @@ import { escapeHTML, paperDocument } from './remediate.js';
 
 function csvCell(value) {
   let text = value == null ? '' : String(value);
-  if (typeof value !== 'number' && /^(?:[\s\u0000-\u001f\ufeff]*[=+\-\u2212@\uff1d\uff0b\uff0d\uff20]|[ ]*[\t\r\n])/.test(text)) text = "'" + text;
+  if (typeof value !== 'number' && /^[\s\u0000-\u001f\u007f-\u009f\p{Cf}]*(?:[=+\-\u2212@\uff1d\uff0b\uff0d\uff20]|[\t\r\n])/u.test(text)) text = "'" + text;
   return `"${text.replace(/"/g, '""')}"`;
 }
 
@@ -21,11 +21,14 @@ export function auditCSV(before, after) {
   return csv(rows);
 }
 
-const field = value => String(value).replace(/[\t\r\n\u0000]/g, ' ');
+const field = value => {
+  const text = String(value).replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, ' ');
+  return text.startsWith('#') ? ' ' + text : text;
+};
 
 export function ankiTSV(cards) {
   return ['#separator:Tab', '#html:false', '#columns:Front\tBack',
-    ...cards.map(card => `${field(card.front)}\t${field(card.back)} | Source [${card.sourceStart}, ${card.sourceEnd})`)].join('\n') + '\n';
+    ...cards.map(card => `${field(card.front)}\t${field(card.back)} | Source [${field(card.sourceStart)}, ${field(card.sourceEnd)})`)].join('\n') + '\n';
 }
 
 export function reviewCSV(cards, ratings) {
@@ -42,7 +45,7 @@ export function canonicalJSON(input) {
     let value = holder[key];
     if (value != null && (typeof value === 'object' || typeof value === 'function' || typeof value === 'bigint') &&
         typeof value.toJSON === 'function') value = value.toJSON(key);
-    if (value instanceof Number || value instanceof String || value instanceof Boolean) value = value.valueOf();
+    if (value instanceof Number || value instanceof String || value instanceof Boolean || value instanceof BigInt || value instanceof Symbol) value = value.valueOf();
     if (value === null || typeof value !== 'object') return JSON.stringify(value);
     if (active.has(value)) throw new TypeError('Cannot encode a circular object.');
     active.add(value);

@@ -141,3 +141,87 @@ test('parser reports depth termination instead of recursing', () => {
   assert.equal(result.limited, true);
   assert.ok(result.elements.length < 100);
 });
+
+test('abrupt comment closers do not swallow the rest of the document', () => {
+  assert.equal(extract('<p>one</p><!--><p>two</p>').text, 'one\ntwo');
+  assert.equal(extract('<p>one</p><!---><p>two</p>').text, 'one\ntwo');
+  assert.equal(extract('<p>aaa</p><!-- c --!><p>bbb</p>').text, 'aaa\nbbb');
+  assert.equal(extract('<p>a</p><!-- unclosed').text, 'a');
+});
+
+test('plaintext content is extracted as raw text', () => {
+  assert.equal(extract('<p>before</p><plaintext>AFTER <i>RAW</i> TEXT').text, 'before\nAFTER <i>RAW</i> TEXT');
+});
+
+test('a very long tag still parses instead of leaking markup as text', () => {
+  const source = '<div title="' + 'A'.repeat(5000) + '">MARKER</div>';
+  assert.equal(extract(source).text, 'MARKER');
+});
+
+test('preformatted whitespace is preserved', () => {
+  assert.equal(extract('<pre>line1\n   line2\n\tline3</pre>').text, 'line1\n   line2\n\tline3');
+});
+
+test('textarea default value and xmp raw text are extracted', () => {
+  assert.equal(extract('<textarea>DEFAULT VALUE</textarea>').text, 'DEFAULT VALUE');
+  assert.equal(extract('<xmp>RAW <b>TEXT</b></xmp>').text, 'RAW <b>TEXT</b>');
+});
+
+test('a stray closing br is treated as a line break', () => {
+  assert.equal(extract('<p>a</br>b</p>').text, 'a\nb');
+});
+
+test('a nested anchor closes the outer anchor', () => {
+  const parsed = tokenizeHTML('<div><a href="/1">one<a href="/2">two</a></a></div>');
+  const links = parsed.elements.filter(e => e.tag === 'a');
+  assert.equal(links.length, 2);
+  assert.equal(links[0].label.trim(), 'one');
+  assert.equal(links[1].label.trim(), 'two');
+  assert.notEqual(links[1].parent?.tag, 'a');
+});
+
+test('aria-hidden content is invisible to the audit but still extracted', () => {
+  assert.ok(issues('<h1>A</h1><h2><span aria-hidden="true">Secret</span></h2>').includes('empty-heading'));
+  assert.equal(extract('<p><span aria-hidden="true">Secret</span> text</p>').text, 'Secret text');
+});
+
+test('extra named entities decode including inside style attributes', () => {
+  assert.equal(decodeEntities('&LT;b&GT; a&colon;b'), '<b> a:b');
+  assert.equal(extract('<div style="display&colon;none">x</div>').text, '');
+});
+
+test('a transparent background shorthand does not disable contrast checks', () => {
+  assert.ok(issues('<div style="background:#fff"><p style="color:#aaa;background:transparent">sample text for the audit here</p></div>').includes('contrast'));
+});
+
+test('the font shorthand feeds size and weight into contrast and tiny-text', () => {
+  assert.equal(issues('<p style="font:24px serif;color:#797979;background:#fff">large sample</p>').filter(i => i === 'contrast').length, 0);
+  assert.ok(issues('<p style="font:8pt serif;color:#111;background:#fff">tiny sample</p>').includes('tiny-text'));
+});
+
+test('all-caps text nested in inline elements is still flagged', () => {
+  assert.ok(issues('<p><span>THIS IS A LONG ALL CAPS SENTENCE FOR TESTING</span></p>').includes('caps-block'));
+});
+
+test('accessible names resolve through img alt, hidden references and svg titles', () => {
+  assert.equal(issues('<span id="i"><img alt="Save icon"></span><button aria-labelledby="i"></button>').filter(i => i === 'button-name').length, 0);
+  assert.equal(issues('<div hidden id="x">Secret name</div><button aria-labelledby="x"></button>').filter(i => i === 'button-name').length, 0);
+  assert.equal(issues('<button><svg><title>Save</title></svg></button>').filter(i => i === 'button-name').length, 0);
+});
+
+test('a title attribute satisfies the empty-heading check like sibling name rules', () => {
+  assert.equal(issues('<h1>Top</h1><h2 title="Named section"></h2>').filter(i => i === 'empty-heading').length, 0);
+});
+
+test('area hrefs are audited for link purpose and objects for titles', () => {
+  assert.ok(issues('<map name="m"><area href="/x"></map>').includes('link-purpose'));
+  assert.equal(issues('<map name="m"><area href="/x" alt="Campus map"></map>').filter(i => i === 'link-purpose').length, 0);
+  assert.ok(issues('<object data="/o"></object>').includes('frame-title'));
+  assert.ok(issues('<embed src="/e">').includes('frame-title'));
+  assert.equal(issues('<object data="/o" title="Chart"></object>').filter(i => i === 'frame-title').length, 0);
+});
+
+test('ancestor labels from image alt text honor the shared length cap', () => {
+  const parsed = tokenizeHTML(`<a href="/x"><img alt="${'A'.repeat(3900)}"></a>`);
+  assert.equal(parsed.elements.find(e => e.tag === 'a').label.length <= 2048, true);
+});

@@ -36,18 +36,25 @@ export function contrastRatio(foreground, background) {
 
 function declarations(raw = '') {
   const result = new Map();
+  const put = (key, value, important) => { if (!result.get(key)?.important || important) result.set(key, {value, important}); };
   for (const entry of raw.split(';')) {
     const colon = entry.indexOf(':');
     if (colon < 0) continue;
     const key = entry.slice(0, colon).trim().toLowerCase();
     const value = entry.slice(colon + 1).trim().toLowerCase();
     const important = /!\s*important$/.test(value);
+    const v = value.replace(/\s*!\s*important$/, '');
+    if (key === 'font') {
+      const size = v.match(/(?:\d+(?:\.\d+)?|\.\d+)(?:px|pt)\b/)?.[0];
+      if (size) put('font-size', size, important);
+      put('font-weight', v.match(/\b(?:bold|bolder|lighter|normal|[1-9]00)\b/)?.[0] ?? 'normal', important);
+      put('font', v, important);
+      continue;
+    }
     const keys = key === 'background' ? ['background-color', 'background-image'] : [key];
     for (const prop of keys) {
-      if (!result.get(prop)?.important || important) {
-        const v = value.replace(/\s*!\s*important$/, '');
-        result.set(prop, {value: key === 'background' && prop === 'background-image' && hexRGB(v) ? 'none' : v, important});
-      }
+      const resolved = key === 'background' && prop === 'background-image' && !/(?:url|gradient|image-set|image|element|paint|cross-fade)\s*\(/.test(v) ? 'none' : v;
+      put(prop, resolved, important);
     }
   }
   return key => result.get(key)?.value;
@@ -108,13 +115,25 @@ export function auditHTML(source, parsed = tokenizeHTML(source)) {
     }
     if (node.tag === 'label' && node.attrs.for && !node.hidden && node.label.trim()) labels.set(node.attrs.for, true);
   }
+  const CAPS_TAGS = /^(?:p|div|section|article|li|h[1-6])$/;
+  const subtree = new Map();
   for (const event of parsed.events) {
-    if (event.type !== 'text') continue;
-    const text = decodeEntities(event.value);
-    if (event.node && text.trim()) ownText.set(event.node, (ownText.get(event.node) ?? '') + text);
-    for (let node = event.node; node; node = node.parent) {
-      if (node.attrs.id && !node.label && text.trim() && node === idOwners.get(node.attrs.id)) {
-        ids.set(node.attrs.id, (ids.get(node.attrs.id) ?? '') + text);
+    if (event.type === 'text') {
+      const text = decodeEntities(event.value);
+      if (event.node && text.trim() && !event.hidden) {
+        ownText.set(event.node, (ownText.get(event.node) ?? '') + text);
+        for (let n = event.node; n; n = n.parent) if (CAPS_TAGS.test(n.tag)) subtree.set(n, (subtree.get(n) ?? '') + text);
+      }
+      for (let node = event.node; node; node = node.parent) {
+        if (node.attrs.id && !node.label && text.trim() && node === idOwners.get(node.attrs.id) && !event.aria && (!event.hidden || node.hidden)) {
+          ids.set(node.attrs.id, (ids.get(node.attrs.id) ?? '') + text);
+        }
+      }
+    } else if (event.type === 'alt') {
+      for (let node = event.node; node; node = node.parent) {
+        if (node.attrs.id && !node.label && event.value.trim() && node === idOwners.get(node.attrs.id) && !event.aria) {
+          ids.set(node.attrs.id, ((ids.get(node.attrs.id) ?? '') + ' ' + event.value).trim());
+        }
       }
     }
   }
@@ -122,20 +141,20 @@ export function auditHTML(source, parsed = tokenizeHTML(source)) {
   let lastHeading = 0;
   for (const node of parsed.elements) {
     const { tag, attrs, parent } = node;
-    if ((node.hidden && !['iframe', 'select', 'textarea'].includes(tag)) || node.excluded) continue;
+    if ((node.hidden && !['iframe', 'select', 'textarea', 'object', 'embed'].includes(tag)) || node.excluded || node.aria) continue;
     const attrib = key => Object.hasOwn(attrs, key);
     const accessible = hasName(node, ids);
     if (/^h[1-6]$/.test(tag)) {
       const level = Number(tag[1]);
       if (level > lastHeading + 1) add('heading-order', lastHeading ? `Heading level ${lastHeading} jumps to ${level}.` : `The first heading is level ${level}, not level 1.`, node);
-      if (!node.label.trim() && !accessible) add('empty-heading', 'Add a heading that identifies the following section.', node);
+      if (!node.label.trim() && !accessible && !attrs.title?.trim()) add('empty-heading', 'Add a heading that identifies the following section.', node);
       lastHeading = level;
     }
     if (tag === 'img' && !attrib('alt') && !accessible && !/^(?:presentation|none)$/i.test(attrs.role ?? '')) {
       add('image-alt', 'Provide meaningful alternative text, or an empty alt attribute for a decorative image.', node);
     }
-    if (tag === 'a' && attrib('href')) {
-      const name = (attrs['aria-label']?.trim() || node.label.trim() || attrs.title?.trim() || '').replace(/\s+/g, ' ');
+    if ((tag === 'a' || tag === 'area') && attrib('href')) {
+      const name = (attrs['aria-label']?.trim() || (tag === 'area' ? attrs.alt?.trim() : node.label.trim()) || attrs.title?.trim() || '').replace(/\s+/g, ' ');
       const referenced = !attrs['aria-label']?.trim() && accessible;
       if (!referenced && (!name || /^(?:click(?: here)?|here|read more|more|learn more|link|details|go)[.!: ]*$/i.test(name))) {
         add('link-purpose', 'Use link text that describes the destination. Surrounding context may also supply the purpose.', node);
@@ -151,7 +170,7 @@ export function auditHTML(source, parsed = tokenizeHTML(source)) {
       const name = tag === 'button' ? node.label : kind === 'image' ? attrs.alt : attrs.value ?? (kind === 'button' ? '' : kind);
       if (!name?.trim()) add('button-name', 'Name the action this button performs.', node);
     }
-    if (tag === 'iframe' && !attrs.title?.trim() && !accessible) add('frame-title', 'Describe the purpose of the embedded content.', node);
+    if (['iframe', 'object', 'embed'].includes(tag) && !attrs.title?.trim() && !accessible) add('frame-title', 'Describe the purpose of the embedded content.', node);
 
     const style = declarations(attrs.style);
     const inherited = styleCache.get(parent) ?? {};
@@ -182,7 +201,7 @@ export function auditHTML(source, parsed = tokenizeHTML(source)) {
   }
   for (const node of parsed.elements) {
     if (node.hidden || !/^(?:p|div|section|article|li|h[1-6])$/.test(node.tag)) continue;
-    const issue = capsDiagnostic(node.label || ownText.get(node) || '', node.start, node.end);
+    const issue = capsDiagnostic(node.label || subtree.get(node) || '', node.start, node.end);
     if (issue) issues.push(issue);
   }
   return issues.sort((a, b) => a.start - b.start || (a.id < b.id ? -1 : Number(a.id > b.id)));

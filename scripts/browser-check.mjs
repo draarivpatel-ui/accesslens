@@ -270,6 +270,30 @@ async function main() {
   check('bundle export is an explicit enabled action',
     await evaluate(`document.getElementById('export-bundle').disabled === false`));
 
+  // Clicking it produces exactly one named blob download and a status line.
+  await evaluate(`window.__dl = []; window.__click = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function () { window.__dl.push({ href: this.href, name: this.download }); };`);
+  await click('#export-bundle');
+  await waitFor(`window.__dl.length > 0`, 'bundle download');
+  check('bundle export downloads a named JSON blob',
+    await evaluate(`window.__dl.length === 1 && window.__dl[0].href.startsWith('blob:') && window.__dl[0].name === 'accesslens-evaluation.json'`));
+  check('export success reaches the status line',
+    await evaluate(`document.getElementById('status').textContent.includes('accesslens-evaluation.json')`));
+  await evaluate(`HTMLAnchorElement.prototype.click = window.__click;`);
+
+  // Keyboard focus carries a visible indicator (WCAG 2.4.7).
+  await key('Tab', 'Tab', 9);
+  await sleep(200);
+  check('Tab focus shows a visible focus ring', await evaluate(`(() => {
+    const el = document.activeElement;
+    if (!el || el === document.body || el === document.documentElement) return false;
+    for (let n = el; n && n !== document.body; n = n.parentElement) {
+      const s = getComputedStyle(n);
+      if (s.outlineStyle !== 'none' && parseFloat(s.outlineWidth) > 0) return true;
+    }
+    return false;
+  })()`), await evaluate(`document.activeElement?.id || document.activeElement?.tagName`));
+
   // Editing the source invalidates results.
   await click('#document');
   await key('x', 'KeyX', 88, 'x');

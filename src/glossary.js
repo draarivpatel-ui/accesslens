@@ -2,7 +2,8 @@ export const acronyms = Object.freeze({
   AP: 'Advanced Placement', ATP: 'adenosine triphosphate', FAFSA: 'Free Application for Federal Student Aid',
   GPA: 'grade point average', HTML: 'Hypertext Markup Language', ID: 'identification', PDF: 'Portable Document Format',
   RSVP: 'please reply', SAI: 'Student Aid Index', STEM: 'science, technology, engineering and mathematics',
-  USD: 'US dollars', WCAG: 'Web Content Accessibility Guidelines'
+  USD: 'US dollars', WCAG: 'Web Content Accessibility Guidelines',
+  'U.S.': 'United States', 'U.K.': 'United Kingdom', 'U.N.': 'United Nations', 'D.C.': 'District of Columbia'
 });
 
 export const jargon = Object.freeze({
