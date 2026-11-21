@@ -1,0 +1,14 @@
+{
+  "name": "accesslens",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node scripts/serve.mjs",
+    "test": "node --test",
+    "eval": "node scripts/run-evaluation.mjs",
+    "eval:check": "node scripts/run-evaluation.mjs --check",
+    "browser:check": "node scripts/browser-check.mjs"
+  }
+}

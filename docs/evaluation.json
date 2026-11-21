@@ -1,0 +1,423 @@
+{
+  "schema": "accesslens-frozen-eval-v1",
+  "corpusFingerprint": "9f25db4e344a5f173d7a5c795aa709eaa866f1ee81c1024cd874ce5fa5f6bacb",
+  "language": {
+    "tp": 15,
+    "fp": 2,
+    "fn": 1,
+    "precision": 0.8823529411764706,
+    "recall": 0.9375,
+    "f1": 0.9090909090909091,
+    "cases": [
+      {
+        "id": "aid",
+        "tp": 2,
+        "fp": 0,
+        "fn": 0
+      },
+      {
+        "id": "lab",
+        "tp": 3,
+        "fp": 0,
+        "fn": 0
+      },
+      {
+        "id": "admin",
+        "tp": 4,
+        "fp": 0,
+        "fn": 0
+      },
+      {
+        "id": "definitions",
+        "tp": 3,
+        "fp": 0,
+        "fn": 0
+      },
+      {
+        "id": "offsets",
+        "tp": 2,
+        "fp": 0,
+        "fn": 0
+      },
+      {
+        "id": "contrast-case",
+        "tp": 0,
+        "fp": 1,
+        "fn": 0
+      },
+      {
+        "id": "negative",
+        "tp": 0,
+        "fp": 0,
+        "fn": 0
+      },
+      {
+        "id": "out-of-vocabulary",
+        "tp": 0,
+        "fp": 0,
+        "fn": 1
+      },
+      {
+        "id": "case-ambiguity",
+        "tp": 0,
+        "fp": 1,
+        "fn": 0
+      },
+      {
+        "id": "polysemy",
+        "tp": 1,
+        "fp": 0,
+        "fn": 0
+      }
+    ],
+    "byCategory": {
+      "acronym": {
+        "tp": 7,
+        "fp": 2,
+        "fn": 0,
+        "precision": 0.7777777777777778,
+        "recall": 1,
+        "f1": 0.875
+      },
+      "jargon": {
+        "tp": 8,
+        "fp": 0,
+        "fn": 1,
+        "precision": 1,
+        "recall": 0.8888888888888888,
+        "f1": 0.9411764705882353
+      }
+    }
+  },
+  "audit": {
+    "tp": 17,
+    "fp": 0,
+    "fn": 0,
+    "precision": 1,
+    "recall": 1,
+    "f1": 1,
+    "cases": [
+      {
+        "id": "language",
+        "tp": 1,
+        "fp": 0,
+        "fn": 0
+      },
+      {
+        "id": "page-title",
+        "tp": 1,
+        "fp": 0,
+        "fn": 0
+      },
+      {
+        "id": "heading-order",
+        "tp": 1,
+        "fp": 0,
+        "fn": 0
+      },
+      {
+        "id": "empty-heading",
+        "tp": 1,
+        "fp": 0,
+        "fn": 0
+      },
+      {
+        "id": "image-alt",
+        "tp": 1,
+        "fp": 0,
+        "fn": 0
+      },
+      {
+        "id": "link-purpose",
+        "tp": 1,
+        "fp": 0,
+        "fn": 0
+      },
+      {
+        "id": "input-label",
+        "tp": 2,
+        "fp": 0,
+        "fn": 0
+      },
+      {
+        "id": "button-name",
+        "tp": 1,
+        "fp": 0,
+        "fn": 0
+      },
+      {
+        "id": "frame-title",
+        "tp": 1,
+        "fp": 0,
+        "fn": 0
+      },
+      {
+        "id": "contrast",
+        "tp": 1,
+        "fp": 0,
+        "fn": 0
+      },
+      {
+        "id": "caps-block",
+        "tp": 1,
+        "fp": 0,
+        "fn": 0
+      },
+      {
+        "id": "tiny-text",
+        "tp": 1,
+        "fp": 0,
+        "fn": 0
+      },
+      {
+        "id": "clean",
+        "tp": 0,
+        "fp": 0,
+        "fn": 0
+      },
+      {
+        "id": "hidden",
+        "tp": 0,
+        "fp": 0,
+        "fn": 0
+      },
+      {
+        "id": "mixed",
+        "tp": 4,
+        "fp": 0,
+        "fn": 0
+      },
+      {
+        "id": "named",
+        "tp": 0,
+        "fp": 0,
+        "fn": 0
+      }
+    ],
+    "byCategory": {
+      "language": {
+        "tp": 1,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1,
+        "recall": 1,
+        "f1": 1
+      },
+      "page-title": {
+        "tp": 1,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1,
+        "recall": 1,
+        "f1": 1
+      },
+      "heading-order": {
+        "tp": 2,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1,
+        "recall": 1,
+        "f1": 1
+      },
+      "empty-heading": {
+        "tp": 1,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1,
+        "recall": 1,
+        "f1": 1
+      },
+      "image-alt": {
+        "tp": 1,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1,
+        "recall": 1,
+        "f1": 1
+      },
+      "link-purpose": {
+        "tp": 2,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1,
+        "recall": 1,
+        "f1": 1
+      },
+      "input-label": {
+        "tp": 2,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1,
+        "recall": 1,
+        "f1": 1
+      },
+      "button-name": {
+        "tp": 1,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1,
+        "recall": 1,
+        "f1": 1
+      },
+      "frame-title": {
+        "tp": 1,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1,
+        "recall": 1,
+        "f1": 1
+      },
+      "contrast": {
+        "tp": 2,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1,
+        "recall": 1,
+        "f1": 1
+      },
+      "caps-block": {
+        "tp": 1,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1,
+        "recall": 1,
+        "f1": 1
+      },
+      "tiny-text": {
+        "tp": 2,
+        "fp": 0,
+        "fn": 0,
+        "precision": 1,
+        "recall": 1,
+        "f1": 1
+      }
+    }
+  },
+  "ranking": {
+    "denominator": 18,
+    "textRankHits": 13,
+    "leadHits": 8,
+    "cases": [
+      {
+        "id": "return",
+        "gold": [
+          3,
+          4,
+          5
+        ],
+        "selected": [
+          4,
+          5,
+          3
+        ],
+        "baseline": [
+          0,
+          1,
+          2
+        ],
+        "textRankHits": 3,
+        "leadHits": 0
+      },
+      {
+        "id": "model",
+        "gold": [
+          2,
+          3,
+          4
+        ],
+        "selected": [
+          2,
+          3,
+          1
+        ],
+        "baseline": [
+          0,
+          1,
+          2
+        ],
+        "textRankHits": 2,
+        "leadHits": 1
+      },
+      {
+        "id": "aid",
+        "gold": [
+          0,
+          1,
+          3
+        ],
+        "selected": [
+          1,
+          0,
+          3
+        ],
+        "baseline": [
+          0,
+          1,
+          2
+        ],
+        "textRankHits": 3,
+        "leadHits": 2
+      },
+      {
+        "id": "one-off-safety",
+        "gold": [
+          0,
+          2,
+          4
+        ],
+        "selected": [
+          2,
+          4,
+          1
+        ],
+        "baseline": [
+          0,
+          1,
+          2
+        ],
+        "textRankHits": 2,
+        "leadHits": 2
+      },
+      {
+        "id": "list",
+        "gold": [
+          0,
+          2,
+          4
+        ],
+        "selected": [
+          0,
+          1,
+          2
+        ],
+        "baseline": [
+          0,
+          1,
+          2
+        ],
+        "textRankHits": 2,
+        "leadHits": 2
+      },
+      {
+        "id": "context",
+        "gold": [
+          2,
+          3,
+          4
+        ],
+        "selected": [
+          0,
+          1,
+          2
+        ],
+        "baseline": [
+          0,
+          1,
+          2
+        ],
+        "textRankHits": 1,
+        "leadHits": 1
+      }
+    ]
+  }
+}

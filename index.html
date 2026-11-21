@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AccessLens</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 40'%3E%3Ccircle cx='17' cy='16' r='9.5' fill='none' stroke='%2314232b' stroke-width='3'/%3E%3Cline x1='24' y1='23' x2='33' y2='32' stroke='%2314232b' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M12.5 16.4 l3.2 3.2 l6-6.4' fill='none' stroke='%23174962' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="styles.css">
+<script type="module" src="src/app.js"></script>
+</head>
+<body>
+<svg width="0" height="0" hidden aria-hidden="true" focusable="false">
+  <symbol id="lens-mark" viewBox="0 0 40 40">
+    <circle cx="17" cy="16" r="9.5" fill="none" stroke="currentColor" stroke-width="2.4"/>
+    <line x1="24" y1="23" x2="33" y2="32" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+    <path d="M12.5 16.4 l3.2 3.2 l6-6.4" fill="none" stroke="#174962" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+    <line x1="5" y1="36.5" x2="38" y2="36.5" stroke="#e9ef74" stroke-width="2.4" stroke-linecap="round"/>
+  </symbol>
+</svg>
+
+<a class="skip" href="#source">Skip to the document desk</a>
+
+<header class="utility">
+  <div class="brand">
+    <svg class="mark" aria-hidden="true" focusable="false"><use href="#lens-mark"/></svg>
+    <span class="brand-name">AccessLens</span>
+  </div>
+  <nav aria-label="Page sections">
+    <a href="#source">Source</a>
+    <a href="#analysis">Analysis</a>
+    <a href="#comparison">Comparison</a>
+    <a href="#study">Study</a>
+    <a href="#help" id="help-link">Help</a>
+  </nav>
+</header>
+
+<main>
+  <h1>AccessLens</h1>
+
+  <div class="desk">
+    <section id="source" aria-labelledby="source-h" tabindex="-1">
+      <h2 id="source-h">Source</h2>
+      <fieldset id="examples" class="examples">
+        <legend>Example documents</legend>
+      </fieldset>
+      <div class="field">
+        <label for="document">Document text</label>
+        <textarea id="document" rows="15" spellcheck="false" autocomplete="off"></textarea>
+        <p class="hint"><span id="charhint">0 characters</span><span id="limit"></span></p>
+      </div>
+      <div class="field mode-field">
+        <label for="mode">Input mode</label>
+        <select id="mode"></select>
+      </div>
+      <div class="controls">
+        <button id="run" type="button" class="primary">Run checks</button>
+        <button id="repair" type="button" disabled>Build reading copy</button>
+        <label class="check"><input type="checkbox" id="keys"> Key commands <kbd>r</kbd> <kbd>e</kbd></label>
+        <button id="shortcuts" type="button" class="ghost">Shortcuts</button>
+      </div>
+    </section>
+
+    <section id="analysis" aria-labelledby="analysis-h">
+      <h2 id="analysis-h">Analysis board</h2>
+      <p id="status" role="status" class="status">Ready. Pick an example or paste a document, then Run checks.</p>
+      <div class="readout-wrap">
+        <svg class="mark readout-mark" aria-hidden="true" focusable="false"><use href="#lens-mark"/></svg>
+        <div id="readout" class="readout">
+          <p class="idle">The readout fills in after Run checks.</p>
+        </div>
+      </div>
+      <p class="scale">Grade estimates use a US school-grade scale. The Dale-Chall proxy is a separate difficulty score. Neither measures comprehension.</p>
+      <ol id="issues" class="issues"></ol>
+      <p id="issues-idle" class="idle">Findings tied to the source appear here after Run checks.</p>
+      <div id="language-evidence"></div>
+      <div class="exports">
+        <p class="label">Exports</p>
+        <div class="row">
+          <button id="export-html" type="button" disabled>Reading page .html</button>
+          <button id="export-tsv" type="button" disabled>Cards .tsv</button>
+          <button id="export-audit" type="button" disabled>Audit .csv</button>
+          <button id="export-bundle" type="button" disabled>Bundle .json</button>
+          <button id="export-study" type="button" disabled>Study page .html</button>
+          <button id="export-review" type="button" disabled>Review .csv</button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <section id="comparison" aria-labelledby="comparison-h">
+    <div class="section-head">
+      <h2 id="comparison-h">Comparison</h2>
+      <label class="check"><input type="checkbox" id="spacing"> Wide spacing</label>
+    </div>
+    <p id="comparison-summary" class="status" hidden></p>
+    <div class="papers">
+      <article class="paper">
+        <h3>Original</h3>
+        <div id="before" class="paper-body"><p class="idle">The analyzed source appears here once a reading copy is built.</p></div>
+      </article>
+      <article class="paper">
+        <h3>Reading copy</h3>
+        <div id="after" class="paper-body"><p class="idle">Choose Build reading copy to see the suggested edit.</p></div>
+        <div id="notes" class="notes"></div>
+      </article>
+    </div>
+  </section>
+
+  <section id="study" aria-labelledby="study-h">
+    <h2 id="study-h">Study deck</h2>
+    <p id="deck-idle" class="idle">Cards appear here after Run checks. Reveal each card, then rate your recall from 0 to 5 to build a review schedule.</p>
+    <div id="deck" hidden>
+      <div class="deck-meta">
+        <span id="deck-count"></span>
+        <span id="deck-kind" class="badge"></span>
+        <span id="deck-offset" class="offset"></span>
+        <button id="deck-evidence" type="button" class="evidence">Show in source</button>
+      </div>
+      <div class="flashcard">
+        <p id="card-front" class="front"></p>
+        <p id="card-back" class="back" hidden></p>
+      </div>
+      <div class="deck-controls">
+        <button id="card-prev" type="button">Previous</button>
+        <button id="card-reveal" type="button" aria-expanded="false" aria-controls="card-back">Show answer</button>
+        <button id="card-next" type="button">Next</button>
+      </div>
+      <div class="rate">
+        <label for="card-grade">Recall grade</label>
+        <select id="card-grade" disabled>
+          <option value="" selected>Rate 0 to 5</option>
+          <option value="0">0 no recall</option>
+          <option value="1">1</option>
+          <option value="2">2</option>
+          <option value="3">3 recalled with effort</option>
+          <option value="4">4</option>
+          <option value="5">5 instant recall</option>
+        </select>
+        <span id="card-due" class="offset" role="status"></span>
+      </div>
+    </div>
+  </section>
+
+  <details id="help">
+    <summary>How AccessLens works</summary>
+    <div class="cols">
+      <div>
+        <h3>Scores</h3>
+        <ul>
+          <li>Flesch-Kincaid and SMOG estimate a US school grade. Lower estimates suggest easier reading. The Dale-Chall proxy is a separate difficulty score.</li>
+          <li>Difficult-word share is the fraction of words outside a small common vocabulary list.</li>
+          <li>Every estimate is a heuristic check on the text. None of them measure real comprehension.</li>
+          <li>Flag counts are limited checks and signals, not a full WCAG conformance audit.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Key commands</h3>
+        <ul>
+          <li>Turn on Key commands, then press <kbd>r</kbd> to run checks and <kbd>e</kbd> to jump to the editor.</li>
+          <li>Keys never fire while you are typing, while a control has focus, or while a modifier key is held.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Exports</h3>
+        <ul>
+          <li>Reading page .html: the built copy as a standalone readable page.</li>
+          <li>Cards .tsv: deck rows ready for Anki import.</li>
+          <li>Audit .csv: stats and findings in one sheet.</li>
+          <li>Bundle .json: the full report including your pasted source. Review it before sharing.</li>
+          <li>Study page .html: a printable study sheet.</li>
+          <li>Review .csv: your ratings with the next review dates.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Privacy</h3>
+        <ul>
+          <li>Everything runs in this tab. No network calls, no storage, no uploads.</li>
+          <li>Ratings live in memory only, until you export them.</li>
+          <li>The reading copy is a suggested edit. Your source text is never changed.</li>
+        </ul>
+      </div>
+    </div>
+  </details>
+</main>
+
+<footer>
+  <p>AccessLens runs entirely in this browser tab. Text you paste never leaves the page.</p>
+</footer>
+</body>
+</html>

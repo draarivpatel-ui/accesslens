@@ -1,0 +1,46 @@
+{
+  "schema": "impeccable-design/1",
+  "surface": "accesslens-studio",
+  "mode": "operate",
+  "world": "editorial proofreading desk",
+  "palette": {
+    "paper": "#f7f4eb",
+    "paperRaised": "#fbf9f1",
+    "ink": "#14232b",
+    "petrol": "#174962",
+    "petrolDeep": "#0e3547",
+    "acid": "#e9ef74",
+    "brick": "#8f2f1f",
+    "muted": "#41535c",
+    "strategy": "restrained; acid reserved for selection, checked chip and mark rule"
+  },
+  "type": {
+    "display": ["Iowan Old Style", "Georgia", "Times New Roman", "serif"],
+    "body": ["Verdana", "Geneva", "sans-serif"],
+    "measure": ["ui-monospace", "SF Mono", "Menlo", "Consolas", "monospace"],
+    "note": "serif carries headings, document text, paper columns and cards; mono only for offsets and scores; smallest functional font 0.75rem, visual micro-labels floor 0.8rem"
+  },
+  "layout": {
+    "measure": "74rem",
+    "desktop": "two-column desk: source 3fr, analysis board 2fr; comparison two ruled papers; deck below",
+    "mobile": "single column below 920px, controls wrap, no sideways scroll"
+  },
+  "signature": {
+    "mark": "stroke-based lens with a petrol check and a single acid rule, svg symbol lens-mark",
+    "materials": "ruled paper via repeating-linear-gradient at line-height, petrol margin rule, hairline ink separators",
+    "chrome": "acid selection, petrol caret, thin petrol scrollbars, petrol focus ring"
+  },
+  "motion": {
+    "allowed": "single 380ms desk reveal",
+    "gate": "prefers-reduced-motion: no-preference",
+    "banned": "smooth scrolling, animated transitions on state"
+  },
+  "invariants": [
+    "no hero, no kicker or helper line under the title",
+    "no emojis, no long dashes in copy",
+    "no innerHTML; fixed tags with textContent only",
+    "no external requests, fonts or storage; everything in-tab",
+    "status region uses role=status",
+    "all controls are native elements at least 24px tall"
+  ]
+}
