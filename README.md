@@ -16,10 +16,14 @@ Open the loopback URL printed by the server. The same static files can be hosted
 
 ## Try the studio
 
-1. Load **Club page HTML** or paste a document. Select its input mode and run the checks.
+1. Load **Club page HTML** or paste a document. Select its input mode and run the checks. Picking an example writes a `#lens=` hash to the address bar; opening that URL later reloads the same example, and nothing else is stored.
 2. Open a flagged item to select its original source. Use the key points to find important sentences, not to replace a full read.
 3. Build a reading copy. Compare the actual change in estimate and check count. Read the manual review notes before exporting.
-4. Reveal and rate a study card. Export Anki-compatible text or an SM-2 review CSV. Download the separate print sheet and print it from the browser.
+4. Check the WCAG 2.2 audit below the comparison: eight metrics side by side, sentence-length histograms, and a badge row covering reading level, stylesheet contrast and the cognitive-load signal.
+5. Switch the preview profile. Dyslexia spacing applies the WCAG 1.4.12 minimums to the papers, High contrast reports the computed ratio against AAA, and Reader outline shows the heading and glossary structure a screen reader announces.
+6. Export the audit certificate in JSON, CSV or Markdown. Paste its text into the fingerprint checker to confirm it was not edited after export.
+7. Reveal and rate a study card. Export Anki-compatible text or an SM-2 review CSV. Download the separate print sheet and print it from the browser.
+8. Run the in-page self-tests to re-verify the shipped math in your own browser.
 
 The other examples are a fictional AP Biology classroom activity, a fictional scholarship notice, and a simple library guide. The single-letter `R` and `E` shortcuts are off by default. When enabled, they run the checks and focus the source editor; they do not intercept typing in controls.
 
@@ -29,9 +33,12 @@ The other examples are a fictional AP Biology classroom activity, a fictional sc
 - **Readability** uses the published Flesch-Kincaid and SMOG equations with estimated English syllables and sentence boundaries. SMOG needs at least 30 sentences. The Dale-Chall proxy uses the equation with an explicitly smaller classroom list, not the published word list. Estimated reading time uses 200 words per minute.
 - **Auditing** uses a tokenizer that never creates a DOM from pasted HTML. The 12 checks cover page language, title, heading jumps, empty headings, image alternatives, link purpose, control labels, button names, frame titles, inline hex contrast, uppercase passages and tiny inline text. The last two are reading heuristics; several other checks are signals, not conformance decisions.
 - **Contrast** uses WCAG sRGB relative luminance and unrounded threshold decisions for supported opaque foreground/background pairs. It does not compute page styles or guess contrast across unsupported backgrounds.
+- **WCAG audit** adds the published Gunning Fog equation, long-word and jargon density shares, and a sentence-length histogram whose over-25-word flag is a readability heuristic, not a WCAG rule. The SC 3.1.5 badge treats grade 9 or below as lower secondary and requires every available estimate to pass. Contrast badges apply the same luminance math to the reading stylesheet at the published AA and AAA thresholds. The 1.4.12 check measures the dyslexia profile against the published spacing minimums. All of these are signals for supported, declared values, not conformance certification.
+- **Profiles** only restyle the preview. Dyslexia spacing is the fixed 1.4.12 set (letter 0.12em, word 0.16em, line 1.55, paragraph spacing 2em of font size). High contrast swaps the paper palette for ink on white and reports the computed ratio. Reader outline shows heading nesting and glossary terms; it approximates announcement order but is not a screen reader.
 - **Remediation** creates a new text-first artifact with repaired headings, high-contrast reading styles, conservative substitutions, selected sentence splits and a separate checklist. It does not edit original source HTML, guess missing alternative text, or retain interactive elements. Clearer wording can increase the grade estimate.
 - **Evidence** uses original UTF-16 character ranges `[start, end)`, as used by the source editor. A range may include intervening markup or entity spelling. A missing root element has no character to select.
-- **Exports** include inert reading HTML, Anki Basic TSV with cloze-style blanks, quote-escaped and formula-protected CSV, a compact print sheet and a canonical JSON bundle. The bundle fingerprints the sorted JSON payload with SHA-256; it is a reproducibility check, not a signature.
+- **Exports** include inert reading HTML, Anki Basic TSV with cloze-style blanks, quote-escaped and formula-protected CSV, a compact print sheet, a canonical JSON bundle, and the audit certificate in JSON, CSV and Markdown. The certificate fingerprints its canonical payload with a dependency-free SHA-256 implementation and stores source hashes, never source text. Pasting a certificate back recomputes the hash; a mismatch means the payload changed. It is a tamper check, not a signature.
+- **Self-tests** run the same modules the page ships: FIPS 180-4 SHA-256 known answers, the `#000`/`#fff` 21:1 luminance constant, readability determinism and bounds, histogram conservation, CSV formula protection, certificate tamper detection and the non-worsening remediation invariant. Passing them is a regression signal, not a WCAG claim.
 
 ## Reproduce the evidence
 

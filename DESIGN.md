@@ -31,14 +31,15 @@ Strategy: Restrained. Neutral paper and ink with petrol doing the work; acid is 
 
 - Top utility line: brand mark left, section jump links right. The `h1` stands alone; no kicker, no helper line.
 - Desktop: a two-column desk, Source (3fr) beside the Analysis board (2fr), so the readout sits level with the editor it describes.
-- Below the desk: Comparison as two ruled paper columns (Original against Reading copy), then the Study deck, then Help as a single `details`.
-- Mobile (under 920 px): one column; controls wrap; papers stack; nothing scrolls sideways.
+- Below the desk: Comparison as two ruled paper columns (Original against Reading copy), then the WCAG 2.2 audit (metric table, two histograms, badge row, signed certificate and its checker), the Study deck, the Self-tests run, then Help as a single `details`.
+- Mobile (under 920 px): one column; controls wrap; papers stack; histograms go full width; nothing scrolls sideways.
 
 ## Materials
 
 - Paper columns carry real ruled lines (`repeating-linear-gradient` at the text line-height, `1lh`-aligned via `--rule-gap`) and a petrol margin rule, like a proof sheet.
 - The editor textarea is itself ruled stock; the caret is petrol and selection renders as an acid highlight.
 - Cards and fields are flat paper with hairline ink rules. Depth comes from paper layers, not shadows.
+- Histograms are flat petrol bars on the paper ground; bins over the 25-word flag line take `--brick`, matching the error rule. The reader outline nests like a document map, not a tree widget.
 
 ## Motion and chrome
 
@@ -48,9 +49,10 @@ Strategy: Restrained. Neutral paper and ink with petrol doing the work; acid is 
 ## Controls and states
 
 - One primary action (`Run checks`, petrol fill); everything else is a petrol outline. Disabled state is a faded hairline, never a hidden control.
-- Examples are real radio inputs inside a fieldset, styled as chips; the checked chip is the acid highlight.
-- Idle states are serif italic lines that teach the next step; `role="status"` announces every run, repair, grade and export.
+- Examples and preview profiles are real radio inputs inside fieldsets, styled as chips; the checked chip is the acid highlight.
+- Idle states are serif italic lines that teach the next step; `role="status"` announces every run, repair, grade, export, certificate check and self-test batch.
 - Errors are explicit text in the status strip (`--brick`), naming the failure and the next step.
+- Self-test rows and WCAG badges carry `pass`, `fail` or `n/a` verdicts as plain text with a color, never color alone.
 
 ## Invariants
 

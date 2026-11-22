@@ -1,8 +1,13 @@
 import { presets } from './presets.js';
 import { inspectDocument, buildReadingCopy, MAX_SOURCE } from './remediate.js';
-import { auditCSV, ankiTSV, evaluationBundle, readingHTML, studyHTML, reviewCSV } from './exports.js';
+import { auditCSV, ankiTSV, certificateCSV, certificateJSON, certificateMarkdown, evaluationBundle, readingHTML, reviewCSV, studyHTML, verifyCertificate } from './exports.js';
 import { shortcutAction } from './shortcuts.js';
 import { sm2 } from './study.js';
+import { runSelfTests } from './selftest.js';
+import {
+  COPY_THEME, DYSLEXIA_SPACING, compareReports, encodeLensHash, histogramGeometry,
+  parseLensHash, semanticSummary, semanticTree, textSpacingAudit, wcagContrast
+} from './wcag-audit.js';
 
 const $ = id => document.getElementById(id);
 
@@ -39,8 +44,28 @@ const cardGradeEl = $('card-grade');
 const cardDueEl = $('card-due');
 const helpEl = $('help');
 const helpLinkEl = $('help-link');
+const wcagIdleEl = $('wcag-idle');
+const wcagAuditEl = $('wcag-audit');
+const wcagRowsEl = $('wcag-rows');
+const wcagBadgesEl = $('wcag-badges');
+const histBeforeEl = $('hist-before');
+const histAfterEl = $('hist-after');
+const histBeforeCapEl = $('hist-before-cap');
+const histAfterCapEl = $('hist-after-cap');
+const profileEl = $('profile');
+const profileNoteEl = $('profile-note');
+const papersEl = document.querySelector('#comparison .papers');
+const outlineEl = $('outline');
+const outlineSummaryEl = $('outline-summary');
+const outlineTreeEl = $('outline-tree');
+const verifyTextEl = $('verify-text');
+const verifyEl = $('verify');
+const verifyResultEl = $('verify-result');
+const selftestsRunEl = $('selftests-run');
+const selftestsStatusEl = $('selftests-status');
+const selftestsListEl = $('selftests-list');
 
-const state = { report: null, copy: null, ratings: {}, card: 0, revealed: false };
+const state = { report: null, copy: null, ratings: {}, card: 0, revealed: false, profile: 'default' };
 
 const EXPORT_IDS = {
   html: 'export-html',
@@ -48,9 +73,12 @@ const EXPORT_IDS = {
   audit: 'export-audit',
   bundle: 'export-bundle',
   study: 'export-study',
-  review: 'export-review'
+  review: 'export-review',
+  cert: 'export-cert',
+  certcsv: 'export-certcsv',
+  certmd: 'export-certmd'
 };
-const REPORT_EXPORTS = ['export-tsv', 'export-audit', 'export-bundle', 'export-review'];
+const REPORT_EXPORTS = ['export-tsv', 'export-audit', 'export-bundle', 'export-review', 'export-cert', 'export-certcsv', 'export-certmd'];
 const COPY_EXPORTS = ['export-html', 'export-study'];
 
 const READOUT_GROUPS = [
@@ -160,6 +188,8 @@ function invalidate() {
   renderIdleAnalysis();
   renderIdleComparison();
   renderIdleDeck();
+  renderWcag();
+  if (state.profile === 'outline') renderOutline();
   setExports({ analyzed: false, repaired: false });
   setStatus('Source or input mode changed. Run checks again.');
 }
@@ -169,13 +199,14 @@ function clearExample() {
   if (checked) checked.checked = false;
 }
 
-function selectPreset(index) {
+function selectPreset(index, { updateHash = true } = {}) {
   const preset = presets[index];
   if (!preset) return;
   sourceEl.value = preset.source;
   if ([...modeEl.options].some(o => o.value === preset.mode)) modeEl.value = preset.mode;
   updateCount();
   invalidate();
+  if (updateHash) setLensHash(preset);
 }
 
 function buildExamplePicker() {
@@ -334,6 +365,195 @@ function renderDelta(before, after) {
   target.hidden = false;
 }
 
+function metricText(value, kind) {
+  if (value === null || value === undefined) return 'n/a';
+  if (kind === 'share') return `${(value * 100).toFixed(1)}%`;
+  if (kind === 'grade') return `grade ${value.toFixed(2)}`;
+  if (kind === 'time') return formatStat(value, 'time');
+  if (kind === 'int') return String(Math.round(value));
+  return value.toFixed(2);
+}
+
+function metricDeltaCell(row) {
+  const td = el('td', 'num');
+  if (row.delta === null || row.delta === undefined) { td.textContent = '-'; return td; }
+  td.textContent = row.kind === 'share' ? `${row.delta > 0 ? '+' : ''}${(row.delta * 100).toFixed(1)} pt`
+    : row.kind === 'int' || row.kind === 'time' ? `${row.delta > 0 ? '+' : ''}${Math.round(row.delta)}`
+    : `${row.delta > 0 ? '+' : ''}${row.delta.toFixed(2)}`;
+  if (row.delta !== 0) td.classList.add(row.delta < 0 ? 'delta-down' : 'delta-up');
+  return td;
+}
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+function histogramNode(hist, title) {
+  const geo = histogramGeometry(hist);
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${geo.width} ${geo.height}`);
+  svg.setAttribute('role', 'img');
+  svg.setAttribute('aria-label', title);
+  svg.classList.add('hist');
+  const name = document.createElementNS(SVG_NS, 'title');
+  name.textContent = title;
+  svg.append(name);
+  for (const bar of geo.bars) {
+    const rect = document.createElementNS(SVG_NS, 'rect');
+    rect.setAttribute('x', bar.x);
+    rect.setAttribute('y', bar.y);
+    rect.setAttribute('width', bar.width);
+    rect.setAttribute('height', bar.height);
+    rect.setAttribute('fill', bar.load ? '#8f2f1f' : '#174962');
+    const caption = document.createElementNS(SVG_NS, 'title');
+    caption.textContent = `${bar.label} words: ${bar.count} sentence${bar.count === 1 ? '' : 's'}`;
+    rect.append(caption);
+    svg.append(rect);
+    const label = document.createElementNS(SVG_NS, 'text');
+    label.setAttribute('x', bar.x + bar.width / 2);
+    label.setAttribute('y', bar.labelY);
+    label.setAttribute('text-anchor', 'middle');
+    label.classList.add('hist-label');
+    label.textContent = bar.label;
+    svg.append(label);
+  }
+  return svg;
+}
+
+function badgeNode(badge) {
+  const value = badge.scope === 'stylesheet' ? badge.pass : badge.after !== null && badge.after !== undefined ? badge.after : badge.before;
+  const cls = value === null || value === undefined ? 'wcag-na' : value ? 'wcag-pass' : 'wcag-fail';
+  const verdict = value === null || value === undefined ? 'n/a' : value ? 'pass' : 'fail';
+  const li = el('li', cls);
+  li.append(el('span', 'verdict', verdict));
+  const text = badge.scope === 'document'
+    ? `${badge.label}: original ${badge.before === null ? 'n/a' : badge.before ? 'pass' : 'fail'}${badge.after === null ? '' : `, copy ${badge.after ? 'pass' : 'fail'}`}. ${badge.detail}`
+    : `${badge.label}. ${badge.detail}`;
+  li.append(el('span', null, text));
+  return li;
+}
+
+function renderWcag() {
+  const before = state.report;
+  const after = state.copy?.report ?? null;
+  if (!before) {
+    wcagAuditEl.hidden = true;
+    wcagIdleEl.hidden = false;
+    wcagRowsEl.replaceChildren();
+    wcagBadgesEl.replaceChildren();
+    histBeforeEl.replaceChildren();
+    histAfterEl.replaceChildren();
+    return;
+  }
+  wcagIdleEl.hidden = true;
+  wcagAuditEl.hidden = false;
+  const comparison = compareReports(before, after, COPY_THEME);
+  wcagRowsEl.replaceChildren();
+  for (const row of comparison.rows) {
+    const tr = document.createElement('tr');
+    const th = el('th', null, row.label);
+    th.setAttribute('scope', 'row');
+    tr.append(th, el('td', null, metricText(row.before, row.kind)),
+      el('td', null, after ? metricText(row.after, row.kind) : 'not built'), metricDeltaCell(row));
+    wcagRowsEl.append(tr);
+  }
+  wcagBadgesEl.replaceChildren();
+  for (const badge of comparison.badges) wcagBadgesEl.append(badgeNode(badge));
+  histBeforeEl.replaceChildren(histogramNode(comparison.histograms.before, 'Original sentence length distribution'));
+  histBeforeCapEl.textContent = `Original sentence lengths (${comparison.histograms.before.overLimit} over 25 words)`;
+  if (comparison.histograms.after) {
+    histAfterEl.replaceChildren(histogramNode(comparison.histograms.after, 'Reading copy sentence length distribution'));
+    histAfterCapEl.textContent = `Reading copy sentence lengths (${comparison.histograms.after.overLimit} over 25 words)`;
+  } else {
+    histAfterEl.replaceChildren(el('p', 'idle', 'Build a reading copy to compare.'));
+    histAfterCapEl.textContent = 'Reading copy sentence lengths';
+  }
+}
+
+function outlineList(nodes) {
+  const ul = document.createElement('ul');
+  for (const node of nodes) {
+    const li = document.createElement('li');
+    const tag = node.type === 'heading' ? `h${node.level}` : node.kind === 'bullet' ? 'li' : 'p';
+    li.append(el('span', 'h-tag', tag), el('span', 'blk', node.text));
+    if (node.terms?.length) {
+      const terms = el('ul', 'term-list');
+      for (const term of node.terms) {
+        terms.append(el('li', 'term', term.explanation ? `${term.text}: ${term.explanation}` : `${term.text}: needs an author expansion`));
+      }
+      li.append(terms);
+    }
+    if (node.children?.length) li.append(outlineList(node.children));
+    ul.append(li);
+  }
+  return ul;
+}
+
+function renderOutline() {
+  outlineTreeEl.replaceChildren();
+  const copy = state.copy;
+  const blocks = copy?.blocks ?? state.report?.blocks ?? [];
+  if (!blocks.length) {
+    outlineSummaryEl.textContent = 'Run checks, then build a reading copy to see the reader outline.';
+    outlineSummaryEl.hidden = false;
+    return;
+  }
+  const terms = (copy ? copy.report.stats.terms : state.report.stats.terms) ?? [];
+  const tree = semanticTree(blocks, terms);
+  const summary = semanticSummary(blocks);
+  const source = copy ? 'reading copy' : 'original';
+  const original = copy ? semanticSummary(state.report.blocks ?? []) : null;
+  const delta = original ? `, reading time ${formatStat(original.readingSeconds, 'time')} to ${formatStat(summary.readingSeconds, 'time')}` : '';
+  outlineSummaryEl.textContent = `Screen-reader outline of the ${source}: ${summary.headings} headings, ${summary.paragraphs} paragraphs, ${summary.bullets} bullets, ${summary.words} words${delta}.`;
+  outlineSummaryEl.hidden = false;
+  outlineTreeEl.append(outlineList(tree.outline));
+}
+
+const PROFILE_CLASS = { dyslexia: 'profile-dyslexia', contrast: 'profile-contrast', outline: 'profile-outline' };
+
+function updateProfileNote(profile) {
+  profileNoteEl.classList.remove('err');
+  if (profile === 'dyslexia') {
+    const audit = textSpacingAudit(DYSLEXIA_SPACING);
+    profileNoteEl.textContent = `WCAG 1.4.12 text spacing ${audit.pass ? 'pass' : 'fail'}: letter ${DYSLEXIA_SPACING.letterSpacing}em, word ${DYSLEXIA_SPACING.wordSpacing}em, line ${DYSLEXIA_SPACING.lineHeight}em, paragraph ${DYSLEXIA_SPACING.paragraphSpacing}em.`;
+    profileNoteEl.hidden = false;
+  } else if (profile === 'contrast') {
+    const check = wcagContrast('#000000', '#ffffff');
+    profileNoteEl.textContent = `Computed contrast ${check.ratio.toFixed(1)}:1 on black and white. WCAG 1.4.6 AAA needs ${check.aaaMin}:1, ${check.aaa ? 'met' : 'not met'}.`;
+    profileNoteEl.hidden = false;
+  } else if (profile === 'outline') {
+    profileNoteEl.textContent = 'The reader outline shows the heading hierarchy and glossary terms a screen reader announces.';
+    profileNoteEl.hidden = false;
+  } else {
+    profileNoteEl.textContent = '';
+    profileNoteEl.hidden = true;
+  }
+}
+
+function applyProfile(profile) {
+  state.profile = PROFILE_CLASS[profile] ? profile : 'default';
+  comparisonEl.classList.remove('profile-dyslexia', 'profile-contrast', 'profile-outline');
+  if (PROFILE_CLASS[state.profile]) comparisonEl.classList.add(PROFILE_CLASS[state.profile]);
+  outlineEl.hidden = state.profile !== 'outline';
+  papersEl.hidden = state.profile === 'outline';
+  if (state.profile === 'outline') renderOutline();
+  updateProfileNote(state.profile);
+}
+
+function presetIndexFromHash() {
+  const parsed = parseLensHash(location.hash);
+  return parsed ? presets.findIndex(p => p.id === parsed.preset) : -1;
+}
+
+function setLensHash(preset) {
+  const hash = encodeLensHash(preset.id);
+  if (!hash || location.hash === hash) return;
+  try { history.replaceState(null, '', hash); } catch { /* file URLs keep the old hash */ }
+}
+
+function clearLensHash() {
+  if (!parseLensHash(location.hash)) return;
+  try { history.replaceState(null, '', location.pathname + location.search); } catch { /* file URLs keep the old hash */ }
+}
+
 function renderDeck(report) {
   const cards = report.cards || [];
   if (!cards.length) {
@@ -423,6 +643,8 @@ function run() {
     renderIssues(report.issues || []);
     renderLanguageEvidence(report.stats);
     renderIdleComparison();
+    renderWcag();
+    if (state.profile === 'outline') renderOutline();
     renderDeck(report);
     repairEl.disabled = false;
     setExports({ analyzed: true, repaired: false });
@@ -448,6 +670,8 @@ function repair() {
     renderBlocksPreview(afterEl, copy.blocks, 'The builder returned no blocks.');
     renderNotes(copy);
     renderDelta(state.report, copy.report);
+    renderWcag();
+    if (state.profile === 'outline') renderOutline();
     setExports({ analyzed: true, repaired: true });
     setStatus('Reading copy built. The suggested edit sits beside the original below.');
   } catch (err) {
@@ -484,7 +708,10 @@ const EXPORTERS = {
     if (!state.copy) throw new Error('Build a reading copy first.');
     return ['accesslens-study.html', studyHTML(state.copy, state.report), 'text/html'];
   },
-  'export-review': () => ['accesslens-review.csv', reviewCSV(state.report.cards, state.ratings), 'text/csv']
+  'export-review': () => ['accesslens-review.csv', reviewCSV(state.report.cards, state.ratings), 'text/csv'],
+  'export-cert': () => ['accesslens-certificate.json', certificateJSON(state.report, state.copy?.report ?? null), 'application/json'],
+  'export-certcsv': () => ['accesslens-certificate.csv', certificateCSV(state.report, state.copy?.report ?? null), 'text/csv'],
+  'export-certmd': () => ['accesslens-certificate.md', certificateMarkdown(state.report, state.copy?.report ?? null), 'text/markdown']
 };
 
 for (const id of Object.values(EXPORT_IDS)) {
@@ -505,7 +732,7 @@ for (const id of Object.values(EXPORT_IDS)) {
 
 runEl.addEventListener('click', run);
 repairEl.addEventListener('click', repair);
-sourceEl.addEventListener('input', () => { updateCount(); clearExample(); invalidate(); });
+sourceEl.addEventListener('input', () => { updateCount(); clearExample(); clearLensHash(); invalidate(); });
 modeEl.addEventListener('change', () => { clearExample(); invalidate(); });
 spacingEl.addEventListener('change', () => comparisonEl.classList.toggle('roomy', spacingEl.checked));
 cardPrevEl.addEventListener('click', () => { if (state.card > 0) { state.card -= 1; renderCard(); } });
@@ -520,6 +747,50 @@ shortcutsEl.addEventListener('click', () => {
   helpEl.querySelector('summary').focus();
 });
 helpLinkEl.addEventListener('click', () => { helpEl.open = true; });
+profileEl.addEventListener('change', event => {
+  if (event.target.name === 'profile') applyProfile(event.target.value);
+});
+verifyEl.addEventListener('click', () => {
+  verifyResultEl.hidden = false;
+  const text = verifyTextEl.value.trim();
+  if (!text) {
+    verifyResultEl.classList.add('err');
+    verifyResultEl.textContent = 'Paste the certificate text first.';
+    return;
+  }
+  const result = verifyCertificate(text);
+  verifyResultEl.classList.toggle('err', !result.ok);
+  verifyResultEl.textContent = result.ok
+    ? `Certificate intact. SHA-256 ${result.fingerprint.slice(0, 24)}...`
+    : result.reason === 'fingerprint mismatch'
+      ? `Tamper detected: stored fingerprint ${result.actual.slice(0, 24)}... does not match recomputed ${result.expected.slice(0, 24)}...`
+      : result.reason;
+});
+selftestsRunEl.addEventListener('click', () => {
+  selftestsListEl.replaceChildren();
+  selftestsStatusEl.hidden = false;
+  selftestsStatusEl.classList.remove('err');
+  selftestsStatusEl.textContent = 'Running self-tests...';
+  setTimeout(() => {
+    const results = runSelfTests();
+    for (const result of results) {
+      const li = el('li', result.pass ? 'pass' : 'fail');
+      li.append(el('span', 'verdict', result.pass ? 'pass' : 'fail'), el('span', null, result.name));
+      if (result.detail) li.append(el('span', 'detail', result.detail));
+      selftestsListEl.append(li);
+    }
+    const failed = results.filter(result => !result.pass).length;
+    selftestsStatusEl.classList.toggle('err', failed > 0);
+    selftestsStatusEl.textContent = `${results.length - failed} of ${results.length} self-tests passed${failed ? `; ${failed} failed` : ''}.`;
+  }, 30);
+});
+window.addEventListener('hashchange', () => {
+  const index = presetIndexFromHash();
+  if (index < 0) return;
+  const input = examplesEl.querySelector(`input[value="${presets[index].id}"]`);
+  if (input) input.checked = true;
+  selectPreset(index, { updateHash: false });
+});
 
 document.addEventListener('keydown', event => {
   const action = shortcutAction(event, keysEl.checked);
@@ -531,7 +802,14 @@ document.addEventListener('keydown', event => {
 
 buildModePicker();
 buildExamplePicker();
-if (presets[0]) selectPreset(0);
+const hashed = presetIndexFromHash();
+if (hashed >= 0) {
+  const input = examplesEl.querySelector(`input[value="${presets[hashed].id}"]`);
+  if (input) input.checked = true;
+  selectPreset(hashed, { updateHash: false });
+} else if (presets[0]) {
+  selectPreset(0, { updateHash: false });
+}
 updateCount();
 renderIdleAnalysis();
 renderIdleComparison();

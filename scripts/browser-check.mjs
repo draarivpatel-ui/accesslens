@@ -1,8 +1,9 @@
 // AccessLens browser smoke check. Ordinary integration verification, not an
 // evaluation or scoring harness: it starts an ephemeral server and a throwaway
 // headless Chrome profile, drives the page over CDP with real input events,
-// asserts layout and core controls at 1280x800 and 390x844, and captures
-// docs/desktop.png and docs/remediation.png. Node standard library only.
+// asserts layout and core controls at 1440x900 and 390x844, exercises the WCAG
+// comparator, preview profiles, certificate verify and self-test runner, and
+// captures docs/desktop.png and docs/remediation.png. Node standard library only.
 import { spawn } from 'node:child_process';
 import { mkdtemp, rm, mkdir, writeFile, readFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
@@ -237,13 +238,13 @@ async function main() {
   await cdp.send('Network.enable', {}, sid);
   await cdp.send('Log.enable', {}, sid);
 
-  // Desktop pass: 1280x800.
-  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false }, sid);
+  // Desktop pass: 1440x900.
+  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false }, sid);
   await navigate(origin);
   await waitFor(`document.querySelectorAll('#examples .chip').length > 0`, 'example picker to render');
   check('csp meta includes require-trusted-types-for',
     await evaluate(`document.querySelector('meta[http-equiv="Content-Security-Policy"]')?.content.includes("require-trusted-types-for 'script'") === true`));
-  check('1280x800: no horizontal scrollbar',
+  check('1440x900: no horizontal scrollbar',
     await evaluate(`document.documentElement.scrollWidth <= document.documentElement.clientWidth`));
   check('document loads with real content',
     await evaluate(`document.getElementById('document').value.trim().length > 50`));
@@ -372,9 +373,85 @@ async function main() {
   await click('#spacing');
   check('spacing toggle switches the paper columns', roomy === true);
 
-  // No request may leave the page.
-  const bad = requests.filter(u => u && !u.startsWith(origin) && !u.startsWith('data:') && !u.startsWith('blob:') && !u.startsWith('devtools:'));
-  check('no external requests', bad.length === 0, bad.slice(0, 3).join(', '));
+  // WCAG 2.2 comparator rows, histograms and badges.
+  check('wcag comparator renders eight metric rows',
+    await evaluate(`document.querySelectorAll('#wcag-rows tr').length === 8`),
+    `${await evaluate(`document.querySelectorAll('#wcag-rows tr').length`)} found`);
+  check('wcag fk row shows original and copy grades',
+    await evaluate(`(() => { const t = document.querySelectorAll('#wcag-rows tr')[0].textContent; return t.includes('6.40') && t.includes('2.73'); })()`),
+    await evaluate(`document.querySelectorAll('#wcag-rows tr')[0].textContent`));
+  check('both sentence-length histograms render svg bars',
+    await evaluate(`document.querySelectorAll('#hist-before svg rect').length === 8 && document.querySelectorAll('#hist-after svg rect').length === 8`));
+  check('histogram captions count over-25-word sentences',
+    await evaluate(`document.getElementById('hist-before-cap').textContent.includes('over 25 words')`),
+    await evaluate(`document.getElementById('hist-before-cap').textContent`));
+  check('wcag badges render pass and fail verdicts',
+    await evaluate(`document.querySelectorAll('#wcag-badges li').length >= 5 && document.querySelector('#wcag-badges .wcag-pass') !== null`),
+    `${await evaluate(`document.querySelectorAll('#wcag-badges li').length`)} badges`);
+
+  // Accessibility profile switcher re-rules the preview live.
+  await click('#profile .chip:has(input[value="dyslexia"])');
+  await sleep(150);
+  check('dyslexia profile applies 1.4.12 spacing and reports it',
+    await evaluate(`document.getElementById('comparison').classList.contains('profile-dyslexia') && document.getElementById('profile-note').textContent.includes('WCAG 1.4.12')`),
+    await evaluate(`document.getElementById('profile-note').textContent`));
+  await click('#profile .chip:has(input[value="contrast"])');
+  await sleep(150);
+  check('high-contrast profile reports the computed AAA ratio',
+    await evaluate(`document.getElementById('comparison').classList.contains('profile-contrast') && document.getElementById('profile-note').textContent.includes('21.0:1') && document.getElementById('profile-note').textContent.includes('AAA')`),
+    await evaluate(`document.getElementById('profile-note').textContent`));
+  await click('#profile .chip:has(input[value="outline"])');
+  await sleep(200);
+  check('reader outline swaps the papers for a semantic tree',
+    await evaluate(`document.getElementById('comparison').classList.contains('profile-outline') && document.getElementById('outline').hidden === false && document.querySelector('#comparison .papers').hidden === true && document.querySelectorAll('#outline-tree li').length > 0`),
+    `${await evaluate(`document.querySelectorAll('#outline-tree li').length`)} outline items`);
+  check('reader outline announces structure counts',
+    await evaluate(`/\\d+ headings/.test(document.getElementById('outline-summary').textContent)`),
+    await evaluate(`document.getElementById('outline-summary').textContent`));
+  await click('#profile .chip:has(input[value="default"])');
+  await sleep(150);
+  check('default profile restores the paper columns',
+    await evaluate(`document.getElementById('outline').hidden === true && document.querySelector('#comparison .papers').hidden === false && !document.getElementById('comparison').classList.contains('profile-dyslexia') && !document.getElementById('comparison').classList.contains('profile-contrast')`));
+
+  // Signed certificate export and in-page tamper verification.
+  await evaluate(`window.__dl = []; window.__blob = null; window.__click = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function () { window.__dl.push({ href: this.href, name: this.download }); };
+    const origCreate = URL.createObjectURL.bind(URL);
+    URL.createObjectURL = b => { window.__blob = b; return origCreate(b); };
+    URL.revokeObjectURL = () => {};`);
+  await click('#export-cert');
+  await waitFor(`window.__dl.length > 0`, 'certificate download');
+  check('certificate export downloads a named JSON blob',
+    await evaluate(`window.__dl.length === 1 && window.__dl[0].href.startsWith('blob:') && window.__dl[0].name === 'accesslens-certificate.json'`));
+  const certText = await evaluate(`window.__blob.text()`);
+  const cert = JSON.parse(certText);
+  check('certificate carries a SHA-256 fingerprint',
+    cert.algorithm === 'SHA-256' && /^[0-9a-f]{64}$/.test(cert.fingerprint));
+  await evaluate(`document.getElementById('verify-text').value = ${JSON.stringify(certText)}`);
+  await click('#verify');
+  await sleep(150);
+  check('pasted certificate verifies intact',
+    await evaluate(`document.getElementById('verify-result').textContent.startsWith('Certificate intact')`),
+    await evaluate(`document.getElementById('verify-result').textContent`));
+  const tampered = JSON.stringify({ ...cert, payload: { ...cert.payload, issued: 'tampered' } });
+  await evaluate(`document.getElementById('verify-text').value = ${JSON.stringify(tampered)}`);
+  await click('#verify');
+  await sleep(150);
+  check('a tampered certificate is flagged',
+    await evaluate(`document.getElementById('verify-result').textContent.startsWith('Tamper detected')`),
+    await evaluate(`document.getElementById('verify-result').textContent`));
+  check('certificate csv and md exports stay enabled',
+    await evaluate(`document.getElementById('export-certcsv').disabled === false && document.getElementById('export-certmd').disabled === false`));
+
+  // In-page self-test runner proves the shipped math in the browser.
+  await click('#selftests-run');
+  await waitFor(`document.querySelectorAll('#selftests-list li').length > 0`, 'self-tests to finish');
+  const selftest = await evaluate(`(() => {
+    const items = [...document.querySelectorAll('#selftests-list li')];
+    return { total: items.length, passed: items.filter(li => li.classList.contains('pass')).length, status: document.getElementById('selftests-status').textContent };
+  })()`);
+  check('in-page self-test suite passes', selftest.total >= 20 && selftest.total === selftest.passed,
+    `${selftest.passed}/${selftest.total} ${selftest.status}`);
 
   await mkdir(DOCS, { recursive: true });
   await evaluate(`window.scrollTo(0, 0)`);
@@ -384,9 +461,22 @@ async function main() {
   await sleep(300);
   await capture('remediation.png');
 
-  // Mobile pass: 390x844.
+  // URL-hash preset bookmarking via #lens=.
+  check('selecting an example writes a lens hash',
+    await evaluate(`location.hash === '#lens=club'`), await evaluate(`location.hash`));
+  await evaluate(`location.hash = '#lens=aid'`);
+  await waitFor(`document.getElementById('mode').value === 'text' && document.getElementById('document').value.includes('scholarship')`, 'hash-driven preset load');
+  check('changing the lens hash loads that preset', true);
+  check('hash-driven preset checks its radio',
+    await evaluate(`document.querySelector('#examples input[value="aid"]').checked === true`));
+
+  // No request may leave the page.
+  const bad = requests.filter(u => u && !u.startsWith(origin) && !u.startsWith('data:') && !u.startsWith('blob:') && !u.startsWith('devtools:'));
+  check('no external requests', bad.length === 0, bad.slice(0, 3).join(', '));
+
+  // Mobile pass: 390x844, loaded through a lens hash bookmark.
   await cdp.send('Emulation.setDeviceMetricsOverride', { width: 390, height: 844, deviceScaleFactor: 2, mobile: true }, sid);
-  await navigate(origin);
+  await navigate(`${origin}?mobile#lens=aid`);
   await waitFor(`document.querySelectorAll('#examples .chip').length > 0`, 'mobile render');
   check('390x844: no horizontal scrollbar',
     await evaluate(`document.documentElement.scrollWidth <= document.documentElement.clientWidth`));
@@ -398,7 +488,9 @@ async function main() {
   await waitFor(`document.getElementById('repair').disabled === false`, 'mobile run');
   check('click at mobile viewport runs checks', true);
   const valueBefore = await evaluate(`document.getElementById('document').value`);
-  await click('#examples .chip:nth-of-type(2)');
+  check('mobile lens hash loaded the bookmarked preset',
+    valueBefore.includes('scholarship') && await evaluate(`document.querySelector('#examples input[value="aid"]').checked === true`));
+  await click('#examples .chip:nth-of-type(1)');
   await sleep(300);
   const valueAfter = await evaluate(`document.getElementById('document').value`);
   check('mobile example switch loads a different document and clears results',

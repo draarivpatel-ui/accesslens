@@ -1,4 +1,6 @@
 import { escapeHTML, paperDocument } from './remediate.js';
+import { sha256hex } from './sha256.js';
+import { COPY_THEME, compareReports } from './wcag-audit.js';
 
 function csvCell(value) {
   let text = value == null ? '' : String(value);
@@ -85,6 +87,126 @@ export async function evaluationBundle(before, after) {
 }
 
 export const readingHTML = copy => copy.html;
+
+// Signed audit certificate. The payload holds every computed metric, badge and
+// histogram plus a SHA-256 of each source (never the source text itself). The
+// fingerprint is a tamper check on the canonical payload, not a legal signature.
+function certSide(report) {
+  return {
+    mode: report.mode,
+    sourceSHA256: sha256hex(report.source),
+    issueCount: report.issues.length,
+    findings: report.issues.map(issue => ({ id: issue.id, criterion: issue.criterion, start: issue.start, end: issue.end }))
+  };
+}
+
+const certHistogram = hist => ({
+  sentences: hist.sentences,
+  overLimit: hist.overLimit,
+  bins: hist.bins.map(bin => ({ label: bin.label, count: bin.count, load: bin.load }))
+});
+
+export function certificateDoc(before, after = null, issued = new Date().toISOString()) {
+  const comparison = compareReports(before, after, COPY_THEME);
+  const payload = {
+    format: 'accesslens-certificate-v1',
+    spanUnit: 'UTF-16 code units [start,end)',
+    issued,
+    badges: comparison.badges,
+    metrics: comparison.rows.map(row => ({ key: row.key, label: row.label, kind: row.kind, before: row.before, after: row.after, delta: row.delta })),
+    histograms: { before: certHistogram(comparison.histograms.before), after: comparison.histograms.after ? certHistogram(comparison.histograms.after) : null },
+    before: certSide(before),
+    after: after ? certSide(after) : null
+  };
+  return { algorithm: 'SHA-256', fingerprint: sha256hex(canonicalJSON(payload)), payload };
+}
+
+export function certificateJSON(before, after = null, issued) {
+  return canonicalJSON(certificateDoc(before, after, issued)) + '\n';
+}
+
+export function verifyCertificate(text) {
+  let doc;
+  try { doc = JSON.parse(text); } catch { return { ok: false, reason: 'The pasted text is not JSON.' }; }
+  if (!doc || doc.algorithm !== 'SHA-256' || typeof doc.fingerprint !== 'string' || doc.payload === undefined) {
+    return { ok: false, reason: 'This is not an AccessLens certificate document.' };
+  }
+  const expected = sha256hex(canonicalJSON(doc.payload));
+  return expected === doc.fingerprint.toLowerCase()
+    ? { ok: true, fingerprint: expected }
+    : { ok: false, reason: 'fingerprint mismatch', expected, actual: doc.fingerprint };
+}
+
+const certNumber = (value, kind) => {
+  if (value === null || value === undefined) return 'n/a';
+  if (kind === 'share') return `${(value * 100).toFixed(1)}%`;
+  if (kind === 'grade' || kind === 'num') return value.toFixed(2);
+  if (kind === 'time') return `${value} s`;
+  return String(Math.round(value));
+};
+
+export function certificateCSV(before, after = null, issued = new Date().toISOString()) {
+  const doc = certificateDoc(before, after, issued);
+  const rows = [
+    ['AccessLens audit certificate'],
+    ['SHA-256 fingerprint', doc.fingerprint],
+    ['Issued', doc.payload.issued],
+    [],
+    ['Metric', 'Original', 'Reading copy', 'Change'],
+    ...doc.payload.metrics.map(row => [row.label, certNumber(row.before, row.kind), certNumber(row.after, row.kind),
+      row.delta === null ? 'n/a' : `${row.delta > 0 ? '+' : ''}${row.kind === 'share' ? `${(row.delta * 100).toFixed(1)} pt` : certNumber(row.delta, 'num')}`]),
+    [],
+    ['Badge', 'Verdict', 'Detail'],
+    ...doc.payload.badges.map(badge => {
+      const verdict = badge.scope === 'document'
+        ? `original ${badge.before === null ? 'n/a' : badge.before ? 'pass' : 'fail'}, copy ${badge.after === null ? 'n/a' : badge.after ? 'pass' : 'fail'}`
+        : badge.pass ? 'pass' : 'fail';
+      return [badge.label, verdict, badge.detail];
+    }),
+    [],
+    ['Source SHA-256', doc.payload.before.sourceSHA256, doc.payload.after?.sourceSHA256 ?? '-']
+  ];
+  return csv(rows);
+}
+
+const mdCell = value => String(value).replace(/\|/g, '\\|').replace(/[\r\n]+/g, ' ');
+
+export function certificateMarkdown(before, after = null, issued = new Date().toISOString()) {
+  const doc = certificateDoc(before, after, issued);
+  const lines = [
+    '# AccessLens audit certificate',
+    '',
+    `SHA-256 fingerprint: \`${doc.fingerprint}\``,
+    `Issued: ${doc.payload.issued}`,
+    '',
+    'The fingerprint covers the canonical payload below and is a tamper check, not a legal signature.',
+    '',
+    '## Metrics',
+    '',
+    '| Metric | Original | Reading copy | Change |',
+    '| --- | --- | --- | --- |',
+    ...doc.payload.metrics.map(row =>
+      `| ${mdCell(row.label)} | ${certNumber(row.before, row.kind)} | ${certNumber(row.after, row.kind)} | ${row.delta === null ? 'n/a' : `${row.delta > 0 ? '+' : ''}${row.kind === 'share' ? `${(row.delta * 100).toFixed(1)} pt` : certNumber(row.delta, 'num')}`} |`),
+    '',
+    '## Badges',
+    '',
+    ...doc.payload.badges.map(badge => {
+      const verdict = badge.scope === 'document'
+        ? `original ${badge.before === null ? 'n/a' : badge.before ? 'pass' : 'fail'}, copy ${badge.after === null ? 'n/a' : badge.after ? 'pass' : 'fail'}`
+        : badge.pass ? 'pass' : 'fail';
+      return `- **${verdict}** ${mdCell(badge.label)} (${mdCell(badge.detail)})`;
+    }),
+    '',
+    '## Sentence-length histograms',
+    '',
+    `- Original: ${doc.payload.histograms.before.bins.map(bin => `${bin.label} words x${bin.count}`).join(', ')}`,
+    `- Reading copy: ${doc.payload.histograms.after ? doc.payload.histograms.after.bins.map(bin => `${bin.label} words x${bin.count}`).join(', ') : 'not built'}`,
+    '',
+    `Source fingerprints: ${doc.payload.before.sourceSHA256.slice(0, 16)}...${doc.payload.after ? ` to ${doc.payload.after.sourceSHA256.slice(0, 16)}...` : ''}`,
+    ''
+  ];
+  return lines.join('\n');
+}
 
 function shorten(text, n = 190) {
   if (text.length <= n) return text;

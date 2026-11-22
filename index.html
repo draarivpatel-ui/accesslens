@@ -30,7 +30,9 @@
     <a href="#source">Source</a>
     <a href="#analysis">Analysis</a>
     <a href="#comparison">Comparison</a>
+    <a href="#wcag">WCAG audit</a>
     <a href="#study">Study</a>
+    <a href="#selftests">Self-tests</a>
     <a href="#help" id="help-link">Help</a>
   </nav>
 </header>
@@ -91,8 +93,18 @@
   <section id="comparison" aria-labelledby="comparison-h">
     <div class="section-head">
       <h2 id="comparison-h">Comparison</h2>
+      <fieldset id="profile" class="profiles">
+        <legend>Preview profile</legend>
+        <div class="chips">
+          <label class="chip"><input type="radio" name="profile" value="default" checked><span>Default</span></label>
+          <label class="chip"><input type="radio" name="profile" value="dyslexia"><span>Dyslexia spacing</span></label>
+          <label class="chip"><input type="radio" name="profile" value="contrast"><span>High contrast</span></label>
+          <label class="chip"><input type="radio" name="profile" value="outline"><span>Reader outline</span></label>
+        </div>
+      </fieldset>
       <label class="check"><input type="checkbox" id="spacing"> Wide spacing</label>
     </div>
+    <p id="profile-note" class="status" hidden></p>
     <p id="comparison-summary" class="status" hidden></p>
     <div class="papers">
       <article class="paper">
@@ -104,6 +116,52 @@
         <div id="after" class="paper-body"><p class="idle">Choose Build reading copy to see the suggested edit.</p></div>
         <div id="notes" class="notes"></div>
       </article>
+    </div>
+    <div id="outline" hidden>
+      <p id="outline-summary" class="status"></p>
+      <div id="outline-tree" class="outline-tree"></div>
+    </div>
+  </section>
+
+  <section id="wcag" aria-labelledby="wcag-h">
+    <h2 id="wcag-h">WCAG 2.2 audit</h2>
+    <p id="wcag-idle" class="idle">Run checks to compute the readability audit. Build a reading copy to compare both versions.</p>
+    <div id="wcag-audit" hidden>
+      <div class="wcag-scroll">
+        <table class="wcag-table">
+          <caption>Readability metrics, original against reading copy</caption>
+          <thead><tr><th scope="col">Metric</th><th scope="col">Original</th><th scope="col">Reading copy</th><th scope="col">Change</th></tr></thead>
+          <tbody id="wcag-rows"></tbody>
+        </table>
+      </div>
+      <div class="hists">
+        <figure>
+          <figcaption id="hist-before-cap">Original sentence lengths</figcaption>
+          <div id="hist-before"></div>
+        </figure>
+        <figure>
+          <figcaption id="hist-after-cap">Reading copy sentence lengths</figcaption>
+          <div id="hist-after"></div>
+        </figure>
+      </div>
+      <p class="scale">Brick bars mark sentences over 25 words, the cognitive-load flag. Badges are deterministic signals on measured values, not a conformance claim.</p>
+      <ul id="wcag-badges" class="wcag-badges"></ul>
+    </div>
+    <div class="certificate">
+      <h3>Signed certificate</h3>
+      <p class="scale">The certificate fingerprints the canonical audit payload with a dependency-free SHA-256 implementation. It proves the report was not edited after export; it is a tamper check, not a legal signature. Source text never appears in it, only its hash.</p>
+      <div class="row">
+        <button id="export-cert" type="button" disabled>Certificate .json</button>
+        <button id="export-certcsv" type="button" disabled>Certificate .csv</button>
+        <button id="export-certmd" type="button" disabled>Certificate .md</button>
+      </div>
+      <div class="field verify">
+        <label for="verify-text">Verify a certificate</label>
+        <textarea id="verify-text" rows="4" spellcheck="false" autocomplete="off"></textarea>
+        <p class="hint">Paste the contents of an accesslens-certificate.json file to check its fingerprint.</p>
+      </div>
+      <button id="verify" type="button">Check fingerprint</button>
+      <p id="verify-result" role="status" class="status" hidden></p>
     </div>
   </section>
 
@@ -142,14 +200,22 @@
     </div>
   </section>
 
+  <section id="selftests" aria-labelledby="selftests-h">
+    <h2 id="selftests-h">Self-tests</h2>
+    <p class="scale">Each check runs the same math the studio ships: FIPS 180-4 SHA-256 known answers, WCAG relative luminance, readability determinism, CSV formula safety and the remediation non-worsening invariant.</p>
+    <button id="selftests-run" type="button">Run self-tests</button>
+    <p id="selftests-status" role="status" class="status" hidden></p>
+    <ol id="selftests-list" class="selftests"></ol>
+  </section>
+
   <details id="help">
     <summary>How AccessLens works</summary>
     <div class="cols">
       <div>
         <h3>Scores</h3>
         <ul>
-          <li>Flesch-Kincaid and SMOG estimate a US school grade. Lower estimates suggest easier reading. The Dale-Chall proxy is a separate difficulty score.</li>
-          <li>Difficult-word share is the fraction of words outside a small common vocabulary list.</li>
+          <li>Flesch-Kincaid, SMOG and Gunning Fog estimate a US school grade. Lower estimates suggest easier reading. The Dale-Chall proxy is a separate difficulty score.</li>
+          <li>Difficult-word share is the fraction of words outside a small common vocabulary list. Long-word share counts the 3+ syllable estimate.</li>
           <li>Every estimate is a heuristic check on the text. None of them measure real comprehension.</li>
           <li>Flag counts are limited checks and signals, not a full WCAG conformance audit.</li>
         </ul>
@@ -162,6 +228,15 @@
         </ul>
       </div>
       <div>
+        <h3>WCAG audit</h3>
+        <ul>
+          <li>The audit table compares original and reading copy on published readability equations.</li>
+          <li>Brick histogram bars mark sentences over 25 words.</li>
+          <li>Contrast badges use exact sRGB relative luminance on the export palette.</li>
+          <li>Preview profiles test dyslexia spacing, high contrast and the screen-reader outline.</li>
+        </ul>
+      </div>
+      <div>
         <h3>Exports</h3>
         <ul>
           <li>Reading page .html: the built copy as a standalone readable page.</li>
@@ -170,6 +245,7 @@
           <li>Bundle .json: the full report including your pasted source. Review it before sharing.</li>
           <li>Study page .html: a printable study sheet.</li>
           <li>Review .csv: your ratings with the next review dates.</li>
+          <li>Certificate .json/.csv/.md: the signed audit report. Paste a .json into the verify box to check it.</li>
         </ul>
       </div>
       <div>

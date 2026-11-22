@@ -418,6 +418,131 @@ kbd {
     );
 }
 
+/* Preview profiles: dyslexia spacing, AAA contrast, reader outline. */
+.profiles { border: 0; margin: 0; padding: 0; min-width: 0; }
+.profiles legend {
+  padding: 0;
+  margin-bottom: 0.45rem;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+#profile-note { margin: 0.4rem 0 0.2rem; }
+
+#comparison.profile-dyslexia .paper-body {
+  letter-spacing: 0.12em;
+  word-spacing: 0.16em;
+  line-height: 1.55;
+  background: none;
+}
+#comparison.profile-dyslexia .paper-body p,
+#comparison.profile-dyslexia .paper-body ul { margin-bottom: 2em; }
+#comparison.profile-dyslexia .paper-body p:last-child { margin-bottom: 0; }
+
+#comparison.profile-contrast .paper { background: #fff; border-color: #000; color: #000; }
+#comparison.profile-contrast .paper::before { background: #000; }
+#comparison.profile-contrast .paper > h3 { color: #000; }
+#comparison.profile-contrast .paper-body { background: none; color: #000; }
+#comparison.profile-contrast .paper-body .idle { color: #000; }
+#comparison.profile-contrast .notes { border-top-color: #000; }
+#comparison.profile-contrast .notes h4 { color: #000; }
+
+#outline { margin-top: 0.4rem; }
+.outline-tree {
+  background: var(--paper-raised);
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  padding: 1rem 1.3rem;
+  font-family: var(--serif);
+  overflow-wrap: anywhere;
+}
+.outline-tree ul { list-style: none; padding-left: 1.15rem; margin: 0; border-left: 1px solid var(--line); }
+.outline-tree > ul { padding-left: 0; border-left: 0; }
+.outline-tree li { margin: 0.3rem 0; }
+.outline-tree .h-tag { font: 700 0.72rem var(--mono); color: var(--petrol); margin-right: 0.55rem; }
+.outline-tree .blk { font-size: 0.92rem; }
+.outline-tree ul.term-list { border-left: 0; padding-left: 1.6rem; }
+.outline-tree .term { font: 400 0.78rem var(--sans); color: var(--petrol); }
+
+/* WCAG 2.2 audit section. */
+#wcag { margin-top: 2.6rem; }
+.wcag-scroll { overflow-x: auto; }
+.wcag-table { border-collapse: collapse; width: 100%; font-size: 0.82rem; min-width: 34rem; }
+.wcag-table caption { text-align: left; font: 600 0.88rem var(--serif); margin-bottom: 0.4rem; }
+.wcag-table th, .wcag-table td { border: 1px solid var(--line-strong); padding: 0.32rem 0.6rem; text-align: right; }
+.wcag-table th[scope="col"], .wcag-table td:first-child { text-align: left; }
+.wcag-table thead th { font: 700 0.75rem var(--sans); text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); background: var(--paper-raised); }
+.wcag-table td { font: 400 0.8rem var(--mono); font-variant-numeric: tabular-nums; background: var(--paper-raised); }
+.wcag-table th[scope="row"] { font: 400 0.82rem var(--sans); }
+.wcag-table .delta-down { color: var(--petrol); font-weight: 700; }
+.wcag-table .delta-up { color: var(--brick); font-weight: 700; }
+
+.hists { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1.4rem; margin-top: 1.1rem; }
+.hists figure { margin: 0; min-width: 0; }
+.hists figcaption {
+  font: 700 0.8rem var(--sans);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--petrol);
+  margin-bottom: 0.35rem;
+}
+svg.hist { display: block; width: 100%; height: auto; background: var(--paper-raised); border: 1px solid var(--line-strong); border-radius: 4px; }
+.hist-label { font: 400 8px var(--sans); fill: var(--muted); }
+
+.wcag-badges { list-style: none; display: flex; flex-wrap: wrap; gap: 0.5rem; padding: 0; margin: 1rem 0 0; }
+.wcag-badges li {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.45rem;
+  font-size: 0.78rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 0.28rem 0.7rem;
+  max-width: 100%;
+}
+.wcag-badges .verdict { font: 700 0.72rem var(--mono); text-transform: uppercase; }
+.wcag-pass .verdict { color: var(--petrol); }
+.wcag-fail { border-color: rgba(143, 47, 31, 0.45); }
+.wcag-fail .verdict { color: var(--brick); }
+.wcag-na .verdict { color: var(--muted); }
+
+.certificate { margin-top: 1.7rem; border-top: 1px solid var(--line-strong); padding-top: 0.9rem; }
+.certificate h3 {
+  font: 700 0.8rem var(--sans);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--petrol);
+  margin: 0 0 0.4rem;
+}
+.certificate .row { display: flex; gap: 0.45rem; flex-wrap: wrap; margin-top: 0.7rem; }
+.certificate .row button { font-size: 0.8rem; font-weight: 400; padding: 0.38rem 0.65rem; min-height: 2rem; }
+.verify { margin-top: 1rem; max-width: 44rem; }
+.verify textarea {
+  display: block;
+  width: 100%;
+  font: 400 0.8rem/1.5 var(--mono);
+  color: var(--ink);
+  background: var(--paper-raised);
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  padding: 0.5rem 0.7rem;
+  resize: vertical;
+}
+.verify .hint { justify-content: flex-start; }
+#verify { margin: 0.6rem 0 0; }
+#verify-result { margin-top: 0.7rem; max-width: 44rem; overflow-wrap: anywhere; }
+
+/* Self-tests. */
+#selftests { margin-top: 2.6rem; }
+#selftests-status { margin-top: 0.7rem; max-width: 44rem; }
+.selftests { list-style: none; padding: 0; margin: 0.8rem 0 0; display: grid; gap: 0.4rem; }
+.selftests li { display: flex; gap: 0.55rem; font-size: 0.82rem; align-items: baseline; border-top: 1px solid var(--line); padding-top: 0.4rem; }
+.selftests .verdict { font: 700 0.75rem var(--mono); flex: 0 0 auto; }
+.selftests .pass .verdict { color: var(--petrol); }
+.selftests .fail .verdict { color: var(--brick); }
+.selftests .detail { color: var(--muted); }
+
 /* Study deck. */
 #study { margin-top: 2.6rem; }
 .deck-meta { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 0.55rem; font-size: 0.75rem; color: var(--muted); }
@@ -494,6 +619,8 @@ footer p { font-size: 0.8rem; color: var(--muted); margin: 0; }
   h1 { font-size: 1.9rem; margin-bottom: 1.1rem; }
   .desk { grid-template-columns: minmax(0, 1fr); gap: 2rem; }
   .papers { grid-template-columns: minmax(0, 1fr); }
+  .hists { grid-template-columns: minmax(0, 1fr); }
   textarea#document { min-height: 13rem; }
   .mode-field select { min-width: 0; width: 100%; }
+  .profiles { flex: 1 1 100%; }
 }

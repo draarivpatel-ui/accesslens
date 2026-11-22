@@ -16,8 +16,8 @@ Students reading difficult handouts, teachers revising them and school teams che
 
 ## Product Purpose
 
-Inspect a document, see evidence tied to the original, compare an edited copy and turn key sentences into a study deck.
+Inspect a document, see evidence tied to the original, compare an edited copy against WCAG readability and contrast signals, turn key sentences into a study deck, and export a fingerprinted audit certificate that detects later edits.
 
 ## Constraints
 
-Keep pasted content in the current tab. No external calls, storage of documents or executable interpretation of source HTML. Report limited checks as limited checks and keep suggested edits distinct from source material. The brief includes four fictional school examples; it supplies no pilot or comprehension evidence.
+Keep pasted content in the current tab. No external calls, storage of documents or executable interpretation of source HTML. Report limited checks as limited checks and keep suggested edits distinct from source material. The certificate fingerprint is a tamper check, not a legal signature. The `#lens=` bookmark only names a shipped example. The brief includes four fictional school examples; it supplies no pilot or comprehension evidence.

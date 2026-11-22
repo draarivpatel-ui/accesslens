@@ -2,9 +2,10 @@ import { auditHTML, capsDiagnostic } from './a11y.js';
 import { analyzeText, detectTerms, sentences, splitLongSentence } from './nlp.js';
 import { makeCards, sourceSpan } from './study.js';
 import { extractHTML, tokenizeHTML } from './tokenize.js';
+import { COPY_THEME } from './wcag-audit.js';
 
 export const MAX_SOURCE = 60000;
-export const PAPER_CSS = `html{color:#14232b;background:#fffdf4;font:18px Verdana,sans-serif}
+export const PAPER_CSS = `html{color:${COPY_THEME.ink};background:${COPY_THEME.background};font:18px Verdana,sans-serif}
 body{margin:0}main{max-width:64ch;margin:0 auto;padding:2rem 1.25rem;line-height:1.75;overflow-wrap:anywhere}
 h1,h2,h3,h4,h5,h6{font-family:Georgia,serif;line-height:1.25;margin-block:1.4em .45em}
 p,li{letter-spacing:.025em;margin-block:.7em}ul{padding-inline-start:1.5em}
