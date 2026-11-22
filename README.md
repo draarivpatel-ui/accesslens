@@ -2,6 +2,8 @@
 
 AccessLens is a document inspection and reading studio for students and educators. Paste plain text or HTML, check the source, and review a proposed reading copy before sharing it. Every key point, term and flashcard can be traced back to the original.
 
+**Live demo:** [https://aariv.me/accesslens/](https://aariv.me/accesslens/)
+
 ## Run locally
 
 Requirements: Node.js 22 or later and a current browser. No install or internet connection is needed.
