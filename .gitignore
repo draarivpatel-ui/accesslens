@@ -2,3 +2,5 @@
 .accesslens-browser-*
 node_modules/
 coverage/
+video/*.wav
+video/*.mp4

@@ -1,0 +1,9 @@
+AccessLens is a local document workbench that turns dense school handouts and inaccessible HTML into a reading copy, an audit tied to the source and a study deck. Everything runs inside this browser tab, with no uploads, no external processing and no document storage. All 388 tests pass, and 33 headless browser checks pass at two viewports with zero console errors and zero external requests.
+
+Load the Club page HTML example, a fictional flyer for a design club build night. Run the checks, and the analysis board lists 13 findings, from a missing page title to weak contrast, an unclear link and unlabeled controls. Open the low contrast finding and press Show in source, and the exact characters in the pasted HTML are selected in the editor.
+
+Build the reading copy, and the comparison shows the payoff. The estimated Flesch Kincaid grade drops from 6.40 to 2.73 while the automated issue count falls from 13 to 0. The review notes admit what the copy leaves behind. It is a reading draft, not a replacement page, and links, controls, tables and media still need human review.
+
+Switch to the AP Biology lab example and run the checks again. The jargon panel pairs terms like osmosis with plain definitions, and the study deck turns the source into cloze and concept cards. Reveal a card, rate your recall, and the spaced repetition schedule updates. Build the reading copy, then the export row writes Anki ready card text and a printable study sheet.
+
+The frozen evaluation is honest about its limits. On the synthetic suite, TextRank matched 13 of 18 labeled key sentences, while the first three sentences matched 8 of 18, and it still misses an isolated warning, like the hot plate caution in the benchmark. The evaluation bundle carries a SHA 256 fingerprint so a reviewer can verify the exact payload. A document never needs to leave the browser. AccessLens. Every finding points back to the source.
