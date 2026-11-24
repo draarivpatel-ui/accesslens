@@ -243,15 +243,20 @@ function isDisabled(node, elements) {
 
 const REPLACED = new Set(['iframe', 'select', 'textarea', 'object', 'embed']);
 const visible = node => !node.aria && !node.excluded && (!node.hidden || REPLACED.has(node.tag));
-const FOCUSABLE = (node, elements) => {
+// Reading eligibility follows control semantics; Tab eligibility also depends
+// on disabled state and tabindex.
+const CONTROL = node => {
   const a = node.attrs;
-  if (!visible(node) || isDisabled(node, elements)) return false;
-  if (a.tabindex !== undefined && Number(a.tabindex) < 0) return false;
   if (node.tag === 'a' || node.tag === 'area') return Object.hasOwn(a, 'href');
   if (node.tag === 'input') return (a.type ?? '').toLowerCase() !== 'hidden';
   return ['button', 'select', 'textarea', 'iframe'].includes(node.tag) || (a.tabindex !== undefined && Number(a.tabindex) >= 0);
 };
+const FOCUSABLE = (node, elements) => visible(node) && !isDisabled(node, elements)
+  && !(node.attrs.tabindex !== undefined && Number(node.attrs.tabindex) < 0) && CONTROL(node);
 const ROLE = { a: 'Link', area: 'Link', button: 'Button', select: 'List box', textarea: 'Edit text', iframe: 'Frame' };
+const controlRole = node => node.tag === 'input'
+  ? (['button', 'submit', 'reset', 'image'].includes((node.attrs.type ?? '').toLowerCase()) ? 'Button' : 'Edit text')
+  : ROLE[node.tag] ?? 'Control';
 const issueAt = (report, node) => (report.issues ?? []).find(i => i.start === node.start && i.end === node.end)
   ?? (report.issues ?? []).find(i => i.start === node.start);
 
@@ -261,7 +266,7 @@ export function keyboardPath(report) {
   const priority = node => Number(node.attrs.tabindex) > 0 ? Number(node.attrs.tabindex) : Infinity;
   return report.parsed.elements.filter(node => FOCUSABLE(node, report.parsed.elements))
     .sort((a, b) => priority(a) === priority(b) ? a.start - b.start : priority(a) - priority(b)).map((node, i) => {
-    const role = node.tag === 'input' ? (['button', 'submit', 'reset', 'image'].includes((node.attrs.type ?? '').toLowerCase()) ? 'Button' : 'Edit text') : ROLE[node.tag] ?? 'Control';
+    const role = controlRole(node);
     const issue = issueAt(report, node);
     const name = accessibleName(node, names);
     return { stop: i + 1, role, name, problem: issue ? issue.label : null, start: node.start };
@@ -274,7 +279,6 @@ export function screenReaderScript(report) {
   const say = (text, problem = null) => out.push({ text, problem });
   if (report.parsed) {
     const names = nameContext(report.parsed);
-    const stops = new Map(keyboardPath(report).map(step => [step.start, step]));
     const root = report.parsed.elements.find(n => n.tag === 'html');
     const title = report.parsed.elements.find(n => n.tag === 'title')?.label.trim();
     say(title ? `Page, "${title}"` : 'Page, untitled', title ? null : RULES['page-title'][0]);
@@ -293,9 +297,10 @@ export function screenReaderScript(report) {
         if (node.attrs.alt === '') continue;
         const file = (node.attrs.src ?? '').split('/').pop();
         say(name ? `Image, "${name}"` : `Image${file ? `, "${file}"` : ', unlabeled'}`, issue?.label ?? null);
-      } else if (stops.has(node.start)) {
-        const step = stops.get(node.start);
-        say(step.name ? `${step.role}, "${step.name}"` : `${step.role}, unlabeled`, issue?.label ?? (step.name ? null : 'No accessible name'));
+      } else if (CONTROL(node)) {
+        const role = controlRole(node);
+        const state = isDisabled(node, report.parsed.elements) ? ', disabled' : '';
+        say(`${role}, ${name ? `"${name}"` : 'unlabeled'}${state}`, issue?.label ?? (name ? null : 'No accessible name'));
       } else if (['p', 'li'].includes(node.tag) && (ownText.get(node) ?? '').trim()) {
         const text = ownText.get(node).replace(/\s+/g, ' ').trim();
         const caps = issue?.id === 'caps-block';

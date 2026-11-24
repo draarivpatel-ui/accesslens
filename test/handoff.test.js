@@ -219,16 +219,18 @@ test('keyboardPath orders positive tabindex before natural and zero order with s
 });
 
 for (const count of [24, 25, 26]) {
-  test(count + ' words get the same cognitive-load verdict in analysis, histogram, badge and Fix Cards', () => {
-    const text = Array(count).fill('word').join(' ') + '.';
-    const r = inspectDocument(text, 'text');
-    const overLimit = count > 25;
-    assert.equal(r.stats.long.length, Number(overLimit));
-    assert.equal(sentenceHistogram(text).overLimit, Number(overLimit));
-    assert.equal(compareReports(r).badges.find(badge => badge.id === 'load').before, !overLimit);
-    assert.equal(buildFixCards(r).some(card => card.id === 'long-sentence'), overLimit);
-    assert.equal(cognitiveView(r.blocks).reduce((sum, block) => sum + block.faded, 0), Math.max(0, count - 25));
-  });
+  for (const separator of [' ', '; ']) {
+    test(count + ' words with ' + JSON.stringify(separator) + ' get the same cognitive-load verdict in analysis, histogram, badge and Fix Cards', () => {
+      const text = Array(12).fill('word').join(' ') + separator + Array(count - 12).fill('word').join(' ') + '.';
+      const r = inspectDocument(text, 'text');
+      const overLimit = count > 25;
+      assert.equal(r.stats.long.length, Number(overLimit));
+      assert.equal(sentenceHistogram(text).overLimit, Number(overLimit));
+      assert.equal(compareReports(r).badges.find(badge => badge.id === 'load').before, !overLimit);
+      assert.equal(buildFixCards(r).some(card => card.id === 'long-sentence'), overLimit);
+      assert.equal(cognitiveView(r.blocks).reduce((sum, block) => sum + block.faded, 0), Math.max(0, count - 25));
+    });
+  }
 }
 
 test('keyboardPath is empty for plain text', () => assert.deepEqual(keyboardPath(report('biology')), []));
@@ -241,6 +243,67 @@ test('screenReaderScript flags the club page problems', () => {
   assert.ok(said.includes('Heading level 6, empty'));
   assert.ok(said.includes('Click here for the signup page.'));
   assert.ok(lines.filter(l => l.problem).length >= 10);
+});
+
+test('screenReaderScript announces a visible disabled button that keyboardPath skips', () => {
+  const r = html('<button disabled>Unavailable</button><button>Available</button>');
+  assert.deepEqual(keyboardPath(r).map(step => step.name), ['Available']);
+  assert.deepEqual(screenReaderScript(r), [
+    { text: 'Page, "T"', problem: null },
+    { text: 'Button, "Unavailable", disabled', problem: null },
+    { text: 'Button, "Available"', problem: null }
+  ]);
+});
+
+for (const [source, role, name] of [
+  ['<input disabled aria-label="Unavailable field">', 'Edit text', 'Unavailable field'],
+  ['<input type="button" disabled value="Unavailable action">', 'Button', 'Unavailable action'],
+  ['<input type="submit" disabled value="Unavailable submit">', 'Button', 'Unavailable submit'],
+  ['<input type="reset" disabled value="Unavailable reset">', 'Button', 'Unavailable reset'],
+  ['<input type="image" disabled alt="Unavailable image">', 'Button', 'Unavailable image'],
+  ['<select disabled aria-label="Unavailable choices"><option>A</option></select>', 'List box', 'Unavailable choices'],
+  ['<textarea disabled aria-label="Unavailable notes"></textarea>', 'Edit text', 'Unavailable notes']
+]) {
+  test(`screenReaderScript announces the disabled state of ${name}`, () => {
+    const r = html(source);
+    assert.deepEqual(keyboardPath(r), []);
+    assert.deepEqual(screenReaderScript(r), [
+      { text: 'Page, "T"', problem: null },
+      { text: `${role}, "${name}", disabled`, problem: null }
+    ]);
+  });
+}
+
+test('screenReaderScript announces inherited disabled state with the first legend exemption', () => {
+  const r = html('<fieldset disabled><legend>Contact <input aria-label="Legend field"></legend>' +
+    '<button>Disabled child</button><legend>Later <input aria-label="Later legend field"></legend></fieldset>' +
+    '<button>Available</button>');
+  assert.deepEqual(keyboardPath(r).map(step => step.name), ['Legend field', 'Available']);
+  assert.deepEqual(screenReaderScript(r).map(line => line.text), [
+    'Page, "T"', 'Edit text, "Legend field"', 'Button, "Disabled child", disabled',
+    'Edit text, "Later legend field", disabled', 'Button, "Available"'
+  ]);
+});
+
+test('screenReaderScript keeps source order independently of tabindex and disabled keyboard eligibility', () => {
+  const r = html('<button tabindex="2">Second</button><button tabindex="-1" disabled>Unavailable</button>' +
+    '<button tabindex="1">First</button><a href="/" tabindex="-1">Home</a>');
+  assert.deepEqual(keyboardPath(r).map(step => step.name), ['First', 'Second']);
+  assert.deepEqual(screenReaderScript(r).map(line => line.text), [
+    'Page, "T"', 'Button, "Second"', 'Button, "Unavailable", disabled', 'Button, "First"', 'Link, "Home"'
+  ]);
+});
+
+test('screenReaderScript still excludes hidden disabled controls', () => {
+  const r = html('<button disabled hidden>Hidden button</button><div hidden><button disabled>Hidden child</button></div>' +
+    '<button disabled aria-hidden="true">ARIA hidden</button><button disabled style="display:none">CSS hidden</button>' +
+    '<input disabled type="hidden" aria-label="Hidden input"><select disabled hidden aria-label="Hidden choices"></select>' +
+    '<textarea disabled style="visibility:hidden" aria-label="Hidden notes"></textarea><button>Available</button>');
+  assert.deepEqual(keyboardPath(r).map(step => step.name), ['Available']);
+  assert.deepEqual(screenReaderScript(r), [
+    { text: 'Page, "T"', problem: null },
+    { text: 'Button, "Available"', problem: null }
+  ]);
 });
 
 test('screenReaderScript reads alt text and skips decorative images', () => {

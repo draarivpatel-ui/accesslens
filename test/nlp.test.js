@@ -90,6 +90,16 @@ const longLeft = 'Check the reading at the start of class with the same type of 
 const longRight = 'write that reading in the worksheet and make sure you indicate the proper unit';
 test('long semicolon suggests a sentence split', () => assert.deepEqual(splitLongSentence(`${longLeft}; ${longRight}.`), [`${longLeft}.`, `Write${longRight.slice(5)}.`]));
 test('short semicolon remains untouched', () => assert.equal(splitLongSentence('Read this; do that.'), null));
+for (const count of [24, 25, 26]) {
+  test(`splitLongSentence respects the ${count} word boundary with a safe central semicolon`, () => {
+    const left = Array(12).fill('word').join(' ');
+    const right = Array(count - 12).fill('word').join(' ');
+    const text = `${left}; ${right}.`;
+    assert.equal(words(text).length, count);
+    assert.equal(sentences(text).length, 1);
+    assert.deepEqual(splitLongSentence(text), count > 25 ? [`${left}.`, `Word${right.slice(4)}.`] : null);
+  });
+}
 test('long sentence is flagged when no safe split is available', () => {
   const {long} = analyzeText(`${longLeft} and ${longRight}.`);
   assert.equal(long.length, 1);
@@ -212,7 +222,8 @@ test('passive detector skips nouns and participial adjectives', () => {
 });
 
 test('split suggestion never emits a space before the inserted period', () => {
-  const long = 'Alpha beta gamma delta epsilon zeta eta theta ; then iota kappa lambda mu nu xi omicron pi rho sigma tau upsilon phi chi psi omega';
+  const long = 'Alpha beta gamma delta epsilon zeta eta theta ; then iota kappa lambda mu nu xi omicron pi rho sigma tau upsilon phi chi psi omega again';
+  assert.equal(words(long).length, 26);
   const parts = splitLongSentence(long);
   assert.ok(parts);
   assert.ok(parts[0].endsWith('.') && !parts[0].endsWith(' .'), parts[0]);

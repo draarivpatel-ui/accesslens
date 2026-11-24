@@ -4,6 +4,7 @@ import { readFile, readdir } from 'node:fs/promises';
 import test from 'node:test';
 import { ankiTSV, auditCSV, canonicalJSON, csv, evaluationBundle, fingerprint, readingHTML, reviewCSV, studyHTML } from '../src/exports.js';
 import { presets } from '../src/presets.js';
+import { sentences, words } from '../src/nlp.js';
 import { buildReadingCopy, inspectDocument, MAX_SOURCE, renderBlocks } from '../src/remediate.js';
 import { shortcutAction } from '../src/shortcuts.js';
 import { sm2 } from '../src/study.js';
@@ -39,6 +40,26 @@ test('safe reading copy retains the meaning of a negative command', () => {
   assert.deepEqual(copy.actions, ['Do not send financial records by email.']);
   assert.ok(copy.html.includes('Do not send financial records by email.'));
 });
+for (const count of [24, 25, 26]) {
+  for (const mode of ['text', 'html']) {
+    test(`reading copy respects the ${count} word semicolon boundary in ${mode} mode`, () => {
+      const left = Array(12).fill('word').join(' ');
+      const right = Array(count - 12).fill('word').join(' ');
+      const text = `${left}; ${right}.`;
+      const source = mode === 'html' ? `<html lang="en"><body><p>${text}</p></body></html>` : text;
+      const before = inspectDocument(source, mode);
+      const copy = buildReadingCopy(before);
+      const expected = count > 25 ? `${left}. Word${right.slice(4)}.` : text;
+      assert.equal(before.stats.words, count);
+      assert.equal(before.stats.sentences, 1);
+      assert.deepEqual(copy.blocks.filter(block => block.kind === 'paragraph').map(block => block.text), [expected]);
+      assert.ok(copy.html.includes(`<p>${expected}</p>`));
+      assert.deepEqual(copy.report.blocks.filter(block => block.kind === 'paragraph').map(block => block.text), [expected]);
+      assert.equal(sentences(expected).length, count > 25 ? 2 : 1);
+      assert.deepEqual(words(expected).map(word => word.text.toLowerCase()), words(text).map(word => word.text));
+    });
+  }
+}
 test('simple vocabulary substitutions and first-use expansion are applied without duplicate expansion', () => {
   const copy = buildReadingCopy(inspectDocument('Commence the FAFSA exercise. Use the FAFSA example.'));
   assert.equal(copy.blocks[1].text, 'Start the FAFSA (Free Application for Federal Student Aid) exercise. Use the FAFSA example.');

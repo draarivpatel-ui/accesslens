@@ -177,7 +177,7 @@ export function detectPassive(text) {
 
 export function splitLongSentence(text) {
   const tokens = words(text);
-  if (tokens.length <= 24) return null;
+  if (tokens.length <= COGNITIVE_LOAD_WORDS) return null;
   const leftBoundary = tokens[6].end;
   const rightBoundary = tokens.at(-7).start;
   const breaks = [...text.matchAll(/;\s+|:\s+(?=[a-z])|,\s+(?=(?:then|but|however|and then)\b)/gi)]
