@@ -16,7 +16,7 @@ Open the loopback URL printed by the server. The same static files can be hosted
 
 ## Try the studio
 
-1. Load **Club page HTML** or paste a document. Select its input mode and run the checks. Picking an example writes a `#lens=` hash to the address bar; opening that URL later reloads the same example, and nothing else is stored.
+1. The AP Biology example is already checked when the page opens. Load **Club page HTML** or paste a document. Select its input mode and run the checks. Picking an example writes a `#lens=` hash to the address bar; opening that URL later reloads the same example, and nothing else is stored.
 2. Open a flagged item to select its original source. Use the key points to find important sentences, not to replace a full read.
 3. Build a reading copy. Compare the actual change in estimate and check count. Read the manual review notes before exporting.
 4. Check the WCAG 2.2 audit below the comparison: eight metrics side by side, sentence-length histograms, and a badge row covering reading level, stylesheet contrast and the cognitive-load signal.
@@ -24,8 +24,24 @@ Open the loopback URL printed by the server. The same static files can be hosted
 6. Export the audit certificate in JSON, CSV or Markdown. Paste its text into the fingerprint checker to confirm it was not edited after export.
 7. Reveal and rate a study card. Export Anki-compatible text or an SM-2 review CSV. Download the separate print sheet and print it from the browser.
 8. Run the in-page self-tests to re-verify the shipped math in your own browser.
+9. In Community fix handoff, switch barrier previews, pick who the fixes are for and the format, then copy or download the handoff. Open WCAG math to see how each threshold is computed.
 
 The other examples are a fictional AP Biology classroom activity, a fictional scholarship notice, and a simple library guide. The single-letter `R` and `E` shortcuts are off by default. When enabled, they run the checks and focus the source editor; they do not intercept typing in controls.
+
+## Community fix handoff
+
+Many local nonprofits, schools and clubs run their sites on volunteer time. The handoff section turns one check into something a student volunteer or club webmaster can hand over.
+
+- **Barrier preview.** Beside the document as written, the same content as four groups meet it: blurred and enlarged for low vision, the announcement order a screen reader produces (page title, language, headings, images, links, fields, buttons, frames), the Tab order a keyboard or switch user steps through, and a cognitive-load view where words past the 25-word sentence limit fade and words outside the common vocabulary are marked. Problem lines carry the audit finding that causes them.
+- **Fix Cards.** Findings are grouped by fix and ranked by WCAG 2.2 level (A first, then AA, then AAA and reading heuristics). Each card names the success criterion, who it blocks, the source lines, the effort and the fix in plain words, with a button that selects the source.
+- **Handoff text.** One click copies the cards as a GitHub issue with task boxes, an email to a nonprofit, school or club, or a printable checklist grouped by effort. The same text downloads as Markdown.
+- **How WCAG 2.2 math works.** A drawer walks through the contrast ratio step by step (channel scaling, gamma, relative luminance, ratio) for any two colors with a suggested passing shade, the Flesch-Kincaid grade with this document's own counts, the 2.5.8 Target Size (Minimum) rule with live sliders including the 24 px spacing exception, and the 1.4.12 text spacing minimums. Every number comes from the same functions the audit ships, and unit tests check that they agree.
+
+The previews approximate what assistive technology does; they do not replace testing with a real screen reader, keyboard and people who use them.
+
+![Fix handoff for the club page](docs/handoff.png)
+
+![WCAG 2.2 math drawer](docs/learn.png)
 
 ## What the scores mean
 

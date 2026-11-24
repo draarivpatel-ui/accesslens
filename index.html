@@ -29,11 +29,13 @@
   <nav aria-label="Page sections">
     <a href="#source">Source</a>
     <a href="#analysis">Analysis</a>
+    <a href="#handoff">Fix handoff</a>
     <a href="#comparison">Comparison</a>
     <a href="#wcag">WCAG audit</a>
     <a href="#study">Study</a>
     <a href="#selftests">Self-tests</a>
     <a href="#help" id="help-link">Help</a>
+    <button type="button" id="learn-open" class="nav-button" aria-haspopup="dialog">WCAG math</button>
   </nav>
 </header>
 
@@ -72,12 +74,11 @@
           <p class="idle">The readout fills in after Run checks.</p>
         </div>
       </div>
-      <p class="scale">Grade estimates use a US school-grade scale. The Dale-Chall proxy is a separate difficulty score. Neither measures comprehension.</p>
       <ol id="issues" class="issues"></ol>
       <p id="issues-idle" class="idle">Findings tied to the source appear here after Run checks.</p>
       <div id="language-evidence"></div>
       <div class="exports">
-        <p class="label">Exports</p>
+        <h3 class="label">Exports</h3>
         <div class="row">
           <button id="export-html" type="button" disabled>Reading page .html</button>
           <button id="export-tsv" type="button" disabled>Cards .tsv</button>
@@ -89,6 +90,51 @@
       </div>
     </section>
   </div>
+
+  <section id="handoff" aria-labelledby="handoff-h">
+    <div class="section-head">
+      <h2 id="handoff-h">Community fix handoff</h2>
+      <button type="button" id="learn-open-2" class="ghost" aria-haspopup="dialog">How WCAG 2.2 math works</button>
+    </div>
+    <p id="handoff-idle" class="idle">Run checks to preview barriers and build Fix Cards.</p>
+    <div id="handoff-body" hidden>
+      <fieldset id="barrier" class="profiles barrier-pick">
+        <legend>Barrier preview</legend>
+        <div class="chips" id="barrier-chips"></div>
+      </fieldset>
+      <div class="sim-grid">
+        <article class="sim-pane">
+          <h3>As written</h3>
+          <div id="sim-before" class="sim-body"></div>
+        </article>
+        <article class="sim-pane sim-barrier">
+          <h3 id="sim-after-h">With the barrier</h3>
+          <p id="sim-tally" class="sim-tally" role="status"></p>
+          <div id="sim-after" class="sim-body"></div>
+        </article>
+      </div>
+      <div class="fix-head">
+        <h3 id="fix-h">Fix Cards</h3>
+        <div class="fix-tools">
+          <label class="mini-field">For
+            <select id="fix-audience"></select>
+          </label>
+          <label class="mini-field">Format
+            <select id="fix-format"></select>
+          </label>
+          <button type="button" id="fix-copy" class="primary">Copy handoff</button>
+          <button type="button" id="fix-download">Handoff .md</button>
+        </div>
+      </div>
+      <dl id="fix-summary" class="fix-summary"></dl>
+      <ol id="fix-cards" class="fix-cards" aria-labelledby="fix-h"></ol>
+      <details class="fix-preview">
+        <summary>Preview the handoff text</summary>
+        <textarea id="fix-text" rows="14" readonly spellcheck="false" aria-label="Handoff text"></textarea>
+      </details>
+      <p id="fix-status" class="status" role="status" hidden></p>
+    </div>
+  </section>
 
   <section id="comparison" aria-labelledby="comparison-h">
     <div class="section-head">
@@ -149,7 +195,6 @@
     </div>
     <div class="certificate">
       <h3>Signed certificate</h3>
-      <p class="scale">The certificate fingerprints the canonical audit payload with a dependency-free SHA-256 implementation. It proves the report was not edited after export; it is a tamper check, not a legal signature. Source text never appears in it, only its hash.</p>
       <div class="row">
         <button id="export-cert" type="button" disabled>Certificate .json</button>
         <button id="export-certcsv" type="button" disabled>Certificate .csv</button>
@@ -157,8 +202,7 @@
       </div>
       <div class="field verify">
         <label for="verify-text">Verify a certificate</label>
-        <textarea id="verify-text" rows="4" spellcheck="false" autocomplete="off"></textarea>
-        <p class="hint">Paste the contents of an accesslens-certificate.json file to check its fingerprint.</p>
+        <textarea id="verify-text" rows="4" spellcheck="false" autocomplete="off" placeholder="Paste the contents of accesslens-certificate.json"></textarea>
       </div>
       <button id="verify" type="button">Check fingerprint</button>
       <p id="verify-result" role="status" class="status" hidden></p>
@@ -202,7 +246,6 @@
 
   <section id="selftests" aria-labelledby="selftests-h">
     <h2 id="selftests-h">Self-tests</h2>
-    <p class="scale">Each check runs the same math the studio ships: FIPS 180-4 SHA-256 known answers, WCAG relative luminance, readability determinism, CSV formula safety and the remediation non-worsening invariant.</p>
     <button id="selftests-run" type="button">Run self-tests</button>
     <p id="selftests-status" role="status" class="status" hidden></p>
     <ol id="selftests-list" class="selftests"></ol>
@@ -216,7 +259,7 @@
         <ul>
           <li>Flesch-Kincaid, SMOG and Gunning Fog estimate a US school grade. Lower estimates suggest easier reading. The Dale-Chall proxy is a separate difficulty score.</li>
           <li>Difficult-word share is the fraction of words outside a small common vocabulary list. Long-word share counts the 3+ syllable estimate.</li>
-          <li>Every estimate is a heuristic check on the text. None of them measure real comprehension.</li>
+          <li>Grade estimates use a US school-grade scale. Every estimate is a heuristic check on the text. None of them measure real comprehension.</li>
           <li>Flag counts are limited checks and signals, not a full WCAG conformance audit.</li>
         </ul>
       </div>
@@ -245,7 +288,21 @@
           <li>Bundle .json: the full report including your pasted source. Review it before sharing.</li>
           <li>Study page .html: a printable study sheet.</li>
           <li>Review .csv: your ratings with the next review dates.</li>
-          <li>Certificate .json/.csv/.md: the signed audit report. Paste a .json into the verify box to check it.</li>
+          <li>Certificate .json/.csv/.md: the signed audit report. It fingerprints the canonical audit payload with a dependency-free SHA-256, so any later edit fails the check. It is a tamper check, not a legal signature, and holds only a hash of the source text.</li>
+          <li>Handoff .md: the Fix Cards in the chosen format, ready to paste into a GitHub issue, an email or a printed checklist.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Self-tests</h3>
+        <ul>
+          <li>Each check runs the same math the studio ships: FIPS 180-4 SHA-256 known answers, WCAG relative luminance, readability determinism, CSV formula safety and the remediation non-worsening invariant.</li>
+        </ul>
+      </div>
+      <div>
+        <h3>Fix handoff</h3>
+        <ul>
+          <li>Barrier previews show the document the way four groups meet it: blurred and enlarged for low vision, as a screen reader announces it, as the Tab order a keyboard or switch user steps through, and with long sentences fading and hard words marked for cognitive load.</li>
+          <li>Fix Cards group findings by fix, rank them by WCAG level, and say who each one blocks and how to fix it in plain words.</li>
         </ul>
       </div>
       <div>
@@ -259,6 +316,54 @@
     </div>
   </details>
 </main>
+
+<dialog id="learn" class="drawer" aria-labelledby="learn-h">
+  <div class="drawer-head">
+    <h2 id="learn-h">How WCAG 2.2 math works</h2>
+    <button type="button" id="learn-close" class="drawer-close">Close</button>
+  </div>
+  <div class="drawer-body">
+    <section class="learn-block" aria-labelledby="learn-contrast-h">
+      <h3 id="learn-contrast-h">Contrast ratio</h3>
+      <div class="color-pick">
+        <label class="mini-field">Text<input type="color" id="learn-fg" value="#888888"></label>
+        <label class="mini-field">Background<input type="color" id="learn-bg" value="#ffffff"></label>
+        <p id="learn-sample" class="learn-sample">Bring a notebook and a charged laptop.</p>
+      </div>
+      <ol class="math-steps">
+        <li><span class="step-k">1. Scale each channel to 0 to 1</span><code id="m-srgb"></code></li>
+        <li><span class="step-k">2. Undo the screen gamma</span><code>c &le; 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055)<sup>2.4</sup></code><code id="m-linear"></code></li>
+        <li><span class="step-k">3. Relative luminance</span><code>L = 0.2126 R + 0.7152 G + 0.0722 B</code><code id="m-lum"></code></li>
+        <li><span class="step-k">4. Ratio</span><code>(L<sub>lighter</sub> + 0.05) / (L<sub>darker</sub> + 0.05)</code><code id="m-ratio"></code></li>
+      </ol>
+      <ul id="m-verdicts" class="verdicts"></ul>
+      <p id="m-suggest" class="learn-note"></p>
+    </section>
+    <section class="learn-block" aria-labelledby="learn-fk-h">
+      <h3 id="learn-fk-h">Reading level</h3>
+      <code class="formula">grade = 0.39 &times; words per sentence + 11.8 &times; syllables per word &minus; 15.59</code>
+      <ol id="m-fk" class="math-steps"></ol>
+      <p id="m-fk-verdict" class="learn-note"></p>
+    </section>
+    <section class="learn-block" aria-labelledby="learn-target-h">
+      <h3 id="learn-target-h">Target size</h3>
+      <div class="target-controls">
+        <label class="mini-field">Button size <output id="t-size-out">20 px</output><input type="range" id="t-size" min="8" max="48" step="1" value="20"></label>
+        <label class="mini-field">Gap <output id="t-gap-out">2 px</output><input type="range" id="t-gap" min="0" max="24" step="1" value="2"></label>
+      </div>
+      <div id="t-row" class="target-row" aria-hidden="true"><span></span><span></span><span></span><span></span></div>
+      <p id="t-verdict" class="learn-note"></p>
+    </section>
+    <section class="learn-block" aria-labelledby="learn-spacing-h">
+      <h3 id="learn-spacing-h">Text spacing</h3>
+      <table class="spacing-table">
+        <caption class="sr-only">Text spacing minimums for 16 pixel text</caption>
+        <thead><tr><th scope="col">Property</th><th scope="col">At least</th><th scope="col">For 16 px text</th></tr></thead>
+        <tbody id="m-spacing"></tbody>
+      </table>
+    </section>
+  </div>
+</dialog>
 
 <footer>
   <p>AccessLens runs entirely in this browser tab. Text you paste never leaves the page.</p>

@@ -12,11 +12,11 @@ Static HTML, CSS and browser ES modules. Node runs local serving and tests; the 
 
 ## Users
 
-Students reading difficult handouts, teachers revising them and school teams checking shared materials.
+Students reading difficult handouts, teachers revising them, school teams checking shared materials, and student volunteers or club webmasters handing accessibility fixes to small nonprofits, schools and clubs.
 
 ## Product Purpose
 
-Inspect a document, see evidence tied to the original, compare an edited copy against WCAG readability and contrast signals, turn key sentences into a study deck, and export a fingerprinted audit certificate that detects later edits.
+Inspect a document, see evidence tied to the original, compare an edited copy against WCAG readability and contrast signals, turn key sentences into a study deck, preview the document through four barriers, hand plain-language Fix Cards to whoever runs the site, learn how the WCAG 2.2 thresholds are computed, and export a fingerprinted audit certificate that detects later edits.
 
 ## Constraints
 

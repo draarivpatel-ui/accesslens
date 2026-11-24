@@ -4,6 +4,9 @@ import { auditCSV, ankiTSV, certificateCSV, certificateJSON, certificateMarkdown
 import { shortcutAction } from './shortcuts.js';
 import { sm2 } from './study.js';
 import { runSelfTests } from './selftest.js';
+import { AUDIENCES, BARRIERS, FORMATS, buildFixCards, cognitiveView, documentTitle, formatPack, keyboardPath,
+  packSummary, screenReaderScript } from './handoff.js';
+import { contrastMath, fleschKincaidMath, spacingMath, suggestForeground, targetSize } from './learn.js';
 import {
   COPY_THEME, DYSLEXIA_SPACING, compareReports, encodeLensHash, histogramGeometry,
   parseLensHash, semanticSummary, semanticTree, textSpacingAudit, wcagContrast
@@ -65,7 +68,8 @@ const selftestsRunEl = $('selftests-run');
 const selftestsStatusEl = $('selftests-status');
 const selftestsListEl = $('selftests-list');
 
-const state = { report: null, copy: null, ratings: {}, card: 0, revealed: false, profile: 'default' };
+const state = { report: null, copy: null, ratings: {}, card: 0, revealed: false, profile: 'default',
+  barrier: 'cognitive', barrierChosen: false, audience: 'nonprofit', format: 'github', runs: 0 };
 
 const EXPORT_IDS = {
   html: 'export-html',
@@ -189,6 +193,7 @@ function invalidate() {
   renderIdleComparison();
   renderIdleDeck();
   renderWcag();
+  renderHandoff();
   if (state.profile === 'outline') renderOutline();
   setExports({ analyzed: false, repaired: false });
   setStatus('Source or input mode changed. Run checks again.');
@@ -646,6 +651,9 @@ function run() {
     renderWcag();
     if (state.profile === 'outline') renderOutline();
     renderDeck(report);
+    renderHandoff();
+    state.runs += 1;
+    statusEl.dataset.runs = String(state.runs);
     repairEl.disabled = false;
     setExports({ analyzed: true, repaired: false });
     const count = (report.issues || []).length;
@@ -730,6 +738,273 @@ for (const id of Object.values(EXPORT_IDS)) {
   });
 }
 
+// Community fix handoff: barrier previews and Fix Cards.
+const handoffIdleEl = $('handoff-idle');
+const handoffBodyEl = $('handoff-body');
+const simBeforeEl = $('sim-before');
+const simAfterEl = $('sim-after');
+const simTallyEl = $('sim-tally');
+const fixCardsEl = $('fix-cards');
+const fixTextEl = $('fix-text');
+const fixStatusEl = $('fix-status');
+
+function buildHandoffControls() {
+  const chips = $('barrier-chips');
+  for (const barrier of BARRIERS) {
+    const label = el('label', 'chip');
+    const input = document.createElement('input');
+    input.type = 'radio';
+    input.name = 'barrier';
+    input.value = barrier.id;
+    input.checked = barrier.id === state.barrier;
+    label.append(input, el('span', null, barrier.label));
+    chips.append(label);
+  }
+  for (const [id, aud] of Object.entries(AUDIENCES)) $('fix-audience').append(new Option(aud.label, id));
+  for (const [id, label] of Object.entries(FORMATS)) $('fix-format').append(new Option(label, id));
+  $('fix-audience').value = state.audience;
+  $('fix-format').value = state.format;
+}
+
+function fixStatus(text, kind) {
+  fixStatusEl.hidden = false;
+  fixStatusEl.textContent = text;
+  fixStatusEl.classList.toggle('err', kind === 'err');
+}
+
+const BARRIER_TITLE = {
+  lowvision: 'Blurred and enlarged',
+  screenreader: 'What a screen reader announces',
+  keyboard: 'Tab order for keyboard and switch users',
+  cognitive: 'Long sentences fade, hard words marked'
+};
+
+function renderSimulation() {
+  const report = state.report;
+  renderBlocksPreview(simBeforeEl, report.blocks, 'No readable blocks in this source.');
+  simAfterEl.replaceChildren();
+  simAfterEl.className = `sim-body sim-${state.barrier}`;
+  $('sim-after-h').textContent = BARRIER_TITLE[state.barrier];
+  const issues = report.issues || [];
+  if (state.barrier === 'lowvision') {
+    renderBlocksPreview(simAfterEl, report.blocks, 'No readable blocks in this source.');
+    const n = issues.filter(i => i.id === 'contrast' || i.id === 'tiny-text').length;
+    simTallyEl.textContent = n ? `${n} low-contrast or tiny text finding${n === 1 ? '' : 's'} get even harder to read like this.`
+      : 'No contrast or tiny text findings. Zoom and blur still test the layout.';
+  } else if (state.barrier === 'screenreader') {
+    const lines = screenReaderScript(report);
+    const list = el('ol', 'announce');
+    for (const line of lines) {
+      const li = el('li', line.problem ? 'problem' : '');
+      li.append(el('span', 'said', line.text));
+      if (line.problem) li.append(el('span', 'why', line.problem));
+      list.append(li);
+    }
+    simAfterEl.append(list);
+    const bad = lines.filter(l => l.problem).length;
+    simTallyEl.textContent = `${lines.length} announcements, ${bad} confusing or missing.`;
+  } else if (state.barrier === 'keyboard') {
+    const stops = keyboardPath(report);
+    if (!stops.length) {
+      simAfterEl.append(el('p', 'idle', report.parsed ? 'This page has no links or controls to reach.' : 'Plain text has no links or controls. Switch Input mode to HTML and paste the page source to trace its Tab order.'));
+      simTallyEl.textContent = report.parsed ? '0 Tab stops.' : 'Tab order needs HTML.';
+    } else {
+      const list = el('ol', 'tabpath');
+      for (const stop of stops) {
+        const li = el('li', stop.problem ? 'problem' : '');
+        li.append(el('span', 'key', `Tab ${stop.stop}`), el('span', 'said', `${stop.role}${stop.name ? `, "${stop.name}"` : ', no name'}`));
+        if (stop.problem) li.append(el('span', 'why', stop.problem));
+        list.append(li);
+      }
+      simAfterEl.append(list);
+      const bad = stops.filter(s => s.problem).length;
+      simTallyEl.textContent = `${stops.length} Tab stop${stops.length === 1 ? '' : 's'}, ${bad} a keyboard or voice user cannot identify.`;
+    }
+  } else {
+    const view = cognitiveView(report.blocks);
+    let hard = 0, faded = 0;
+    for (const block of view) {
+      hard += block.hard;
+      faded += block.faded;
+      const node = el(block.kind === 'heading' ? 'h5' : 'p', block.kind === 'bullet' ? 'bullet' : null);
+      for (const token of block.tokens) node.append(token.cls ? el('span', token.cls, token.text) : document.createTextNode(token.text));
+      simAfterEl.append(node);
+    }
+    simTallyEl.textContent = `${hard} hard word${hard === 1 ? '' : 's'} marked, ${faded} word${faded === 1 ? '' : 's'} past the 25-word limit fading out.`;
+  }
+}
+
+function currentPack() {
+  const cards = buildFixCards(state.report);
+  return { cards, text: formatPack(cards, { format: state.format, audience: state.audience, title: documentTitle(state.report) }) };
+}
+
+function renderFixCards() {
+  const { cards, text } = currentPack();
+  const summary = packSummary(cards);
+  const facts = [['Fixes', summary.total], ['High priority', summary.high], ['Quick fixes', summary.quick], ['Groups helped', summary.people.length]];
+  $('fix-summary').replaceChildren(...facts.map(([k, v]) => {
+    const wrap = el('div');
+    wrap.append(el('dt', null, k), el('dd', null, String(v)));
+    return wrap;
+  }));
+  fixCardsEl.replaceChildren();
+  if (!cards.length) fixCardsEl.append(el('li', 'idle', 'No fixes flagged. Still test the page with a keyboard and a screen reader.'));
+  cards.forEach((card, i) => {
+    const li = el('li', `fix-card pri-${card.priority}`);
+    const head = el('div', 'fix-card-head');
+    head.append(el('span', 'pri', `${card.priority[0].toUpperCase()}${card.priority.slice(1)}`), el('h4', null, `${i + 1}. ${card.title}`));
+    const meta = el('p', 'fix-meta');
+    meta.append(el('span', null, card.sc), el('span', null, card.effortLabel),
+      el('span', null, card.lines.length ? `Line${card.lines.length > 1 ? 's' : ''} ${card.lines.join(', ')}` : 'Whole document'));
+    const who = el('ul', 'who');
+    for (const person of card.who) who.append(el('li', null, person));
+    const steps = el('ol', 'steps');
+    for (const step of card.steps) steps.append(el('li', null, step));
+    li.append(head, meta, who, el('p', 'why', `${card.why}${card.terms.length ? ` Terms: ${card.terms.join(', ')}.` : ''}`), steps);
+    if (card.starts.length) li.append(evidenceButton(card.starts[0], card.starts[0] + 1, card.title));
+    fixCardsEl.append(li);
+  });
+  fixTextEl.value = text;
+}
+
+function renderHandoff() {
+  const ready = Boolean(state.report);
+  handoffIdleEl.hidden = ready;
+  handoffBodyEl.hidden = !ready;
+  if (!ready) return;
+  if (!state.barrierChosen) {
+    state.barrier = state.report.parsed ? 'screenreader' : 'cognitive';
+    const input = $('barrier-chips').querySelector(`input[value="${state.barrier}"]`);
+    if (input) input.checked = true;
+  }
+  renderSimulation();
+  renderFixCards();
+}
+
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    const prior = document.activeElement;
+    fixTextEl.closest('details').open = true;
+    fixTextEl.focus();
+    fixTextEl.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch { ok = false; }
+    prior?.focus?.();
+    return ok;
+  }
+}
+
+$('barrier-chips').addEventListener('change', event => {
+  if (event.target.name !== 'barrier') return;
+  state.barrier = event.target.value;
+  state.barrierChosen = true;
+  if (state.report) renderSimulation();
+});
+$('fix-audience').addEventListener('change', event => { state.audience = event.target.value; if (state.report) renderFixCards(); });
+$('fix-format').addEventListener('change', event => { state.format = event.target.value; if (state.report) renderFixCards(); });
+$('fix-copy').addEventListener('click', async () => {
+  if (!state.report) return;
+  const ok = await copyText(currentPack().text);
+  fixStatus(ok ? `Copied the ${FORMATS[state.format].toLowerCase()} text. Paste it where the site owner will see it.`
+    : 'This browser blocked copying. The text is selected in the preview below; use Handoff .md instead.', ok ? null : 'err');
+});
+$('fix-download').addEventListener('click', () => {
+  if (!state.report) return;
+  const name = `accesslens-handoff-${state.format}.md`;
+  download(name, currentPack().text, 'text/markdown');
+  fixStatus(`Saved ${name}.`);
+});
+
+// "How WCAG 2.2 math works" drawer.
+const learnEl = $('learn');
+const fmt = (v, d = 4) => Number(v).toFixed(d);
+
+function renderContrastMath() {
+  const fg = $('learn-fg').value, bg = $('learn-bg').value;
+  const m = contrastMath(fg, bg);
+  if (!m) return;
+  const sample = $('learn-sample');
+  sample.style.color = fg;
+  sample.style.backgroundColor = bg;
+  $('m-srgb').textContent = `text ${m.fg.channels8.join(', ')} / 255 = ${m.fg.srgb.map(c => fmt(c, 3)).join(', ')}; background ${m.bg.srgb.map(c => fmt(c, 3)).join(', ')}`;
+  $('m-linear').textContent = `text ${m.fg.linear.map(c => fmt(c)).join(', ')}; background ${m.bg.linear.map(c => fmt(c)).join(', ')}`;
+  $('m-lum').textContent = `text L = ${fmt(m.fg.L)}; background L = ${fmt(m.bg.L)}`;
+  $('m-ratio').textContent = `(${fmt(m.lighter)} + 0.05) / (${fmt(m.darker)} + 0.05) = ${m.ratio.toFixed(2)} : 1`;
+  const list = $('m-verdicts');
+  list.replaceChildren(...m.verdicts.map(v => {
+    const li = el('li', v.pass ? 'pass' : 'fail');
+    li.append(el('span', 'verdict', v.pass ? 'pass' : 'fail'), el('span', null, `${v.sc} ${v.level}, ${v.text.toLowerCase()}: needs ${v.min}:1`));
+    return li;
+  }));
+  const better = m.verdicts[0].pass ? null : suggestForeground(fg, bg);
+  $('m-suggest').textContent = m.verdicts[0].pass ? 'This pair clears the body text minimum.'
+    : better ? `Closest text color in the same hue that reaches 4.5:1: ${better}.` : 'No shade of this hue reaches 4.5:1 on this background.';
+}
+
+function renderReadingMath() {
+  const steps = $('m-fk');
+  const m = fleschKincaidMath(state.report?.stats);
+  steps.replaceChildren();
+  if (!m) {
+    steps.append(el('li', 'idle', "Run checks to plug in this document's counts."));
+    $('m-fk-verdict').textContent = '';
+    return;
+  }
+  const rows = [
+    ['Counts', `${m.words} words, ${m.sentences} sentences, ${m.syllables} syllables`],
+    ['Words per sentence', `${m.words} / ${m.sentences} = ${m.wps.toFixed(2)}, times 0.39 = ${m.terms[0].toFixed(2)}`],
+    ['Syllables per word', `${m.syllables} / ${m.words} = ${m.spw.toFixed(3)}, times 11.8 = ${m.terms[1].toFixed(2)}`],
+    ['Grade', `${m.terms[0].toFixed(2)} + ${m.terms[1].toFixed(2)} - 15.59 = ${m.grade.toFixed(1)}`]
+  ];
+  for (const [k, v] of rows) {
+    const li = document.createElement('li');
+    li.append(el('span', 'step-k', k), el('code', null, v));
+    steps.append(li);
+  }
+  $('m-fk-verdict').textContent = `3.1.5 Reading Level (AAA) uses the lower secondary level, grade ${m.max} here: ${m.pass ? 'this document is at or below it.' : 'this document is above it, so readers may need a simpler version.'}`;
+}
+
+function renderTargetMath() {
+  const size = Number($('t-size').value), gap = Number($('t-gap').value);
+  $('t-size-out').textContent = `${size} px`;
+  $('t-gap-out').textContent = `${gap} px`;
+  const row = $('t-row');
+  row.style.gap = `${gap}px`;
+  for (const span of row.children) { span.style.width = `${size}px`; span.style.height = `${size}px`; }
+  const t = targetSize(size, gap);
+  row.classList.toggle('fail', !t.pass);
+  $('t-verdict').textContent = `2.5.8 Target Size (Minimum) (AA), new in WCAG 2.2: ${t.pass ? 'pass' : 'fail'}. `
+    + (t.rule === 'size' ? 'Each target is at least 24 by 24 CSS pixels.'
+      : `Targets are under 24 px, so centers must sit at least 24 px apart: ${size} + ${gap} = ${t.pitch} px.`);
+}
+
+function renderSpacingMath() {
+  $('m-spacing').replaceChildren(...spacingMath(16).map(r => {
+    const tr = document.createElement('tr');
+    tr.append(el('th', null, r.label), el('td', null, `${r.factor} × font size`), el('td', null, `${r.px.toFixed(2)} px`));
+    tr.firstChild.scope = 'row';
+    return tr;
+  }));
+}
+
+function openLearn() {
+  renderContrastMath();
+  renderReadingMath();
+  renderTargetMath();
+  renderSpacingMath();
+  learnEl.showModal();
+}
+$('learn-open').addEventListener('click', openLearn);
+$('learn-open-2').addEventListener('click', openLearn);
+$('learn-close').addEventListener('click', () => learnEl.close());
+learnEl.addEventListener('click', event => { if (event.target === learnEl) learnEl.close(); });
+for (const id of ['learn-fg', 'learn-bg']) $(id).addEventListener('input', renderContrastMath);
+for (const id of ['t-size', 't-gap']) $(id).addEventListener('input', renderTargetMath);
+
 runEl.addEventListener('click', run);
 repairEl.addEventListener('click', repair);
 sourceEl.addEventListener('input', () => { updateCount(); clearExample(); clearLensHash(); invalidate(); });
@@ -810,8 +1085,11 @@ if (hashed >= 0) {
 } else if (presets[0]) {
   selectPreset(0, { updateHash: false });
 }
+buildHandoffControls();
 updateCount();
 renderIdleAnalysis();
 renderIdleComparison();
 renderIdleDeck();
 setExports({ analyzed: false, repaired: false });
+renderHandoff();
+run();

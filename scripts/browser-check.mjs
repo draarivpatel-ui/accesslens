@@ -16,6 +16,7 @@ const DOCS = join(ROOT, 'docs');
 const CHROME = process.env.CHROME_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
+const CDP_TIMEOUT = Number(process.env.CDP_TIMEOUT_MS) || 10000;
 const results = [];
 function check(name, ok, detail = '') {
   results.push({ name, ok });
@@ -66,8 +67,8 @@ class CDP {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);
-        reject(new Error(`${method} timed out after 10s`));
-      }, 10000);
+        reject(new Error(`${method} timed out after ${CDP_TIMEOUT / 1000}s`));
+      }, CDP_TIMEOUT);
       this.pending.set(id, {
         resolve: value => { clearTimeout(timer); resolve(value); },
         reject: err => { clearTimeout(timer); reject(err); }
@@ -251,12 +252,16 @@ async function main() {
   check('four example choices render', await evaluate(`document.querySelectorAll('#examples .chip').length === 4`),
     `${await evaluate(`document.querySelectorAll('#examples .chip').length`)} found`);
   check('key command toggle defaults off', await evaluate(`document.getElementById('keys').checked === false`));
+  await waitFor(`document.getElementById('status').dataset.runs === '1'`, 'first view analysis');
+  check('first view opens with the default example already analyzed',
+    await evaluate(`document.getElementById('repair').disabled === false && document.querySelectorAll('#readout .group').length >= 4
+      && document.getElementById('handoff-body').hidden === false && document.querySelectorAll('#fix-cards .fix-card').length > 0`));
 
   // Keyboard guard: r must do nothing while the toggle is off.
   await click('h1');
   await key('r', 'KeyR', 82);
   await sleep(300);
-  check('r with toggle off does not run', await evaluate(`document.getElementById('repair').disabled === true`));
+  check('r with toggle off does not run', await evaluate(`document.getElementById('status').dataset.runs === '1'`));
 
   // Real click on Run checks; the default biology example fills the board.
   await click('#run');
@@ -336,6 +341,68 @@ async function main() {
   check('club source flags 13 issues', clubIssues === 13, `${clubIssues} found`);
   check('club run yields source language evidence',
     await evaluate(`document.querySelector('#language-evidence .language-finding') !== null`));
+
+  // Community fix handoff: barrier previews with real clicks, Fix Cards, formats, copy and download.
+  check('club run builds 13 Fix Cards led by high priority',
+    await evaluate(`document.querySelectorAll('#fix-cards .fix-card').length === 13 && document.querySelector('#fix-cards .fix-card').classList.contains('pri-high')`),
+    `${await evaluate(`document.querySelectorAll('#fix-cards .fix-card').length`)} cards`);
+  check('HTML source opens the screen reader preview with flagged announcements',
+    await evaluate(`document.querySelector('#barrier-chips input[value="screenreader"]').checked && document.querySelectorAll('#sim-after .announce li.problem').length >= 10`));
+  await click('#barrier-chips .chip:has(input[value="keyboard"])');
+  await waitFor(`document.querySelectorAll('#sim-after .tabpath li').length === 4`, 'keyboard path');
+  check('keyboard barrier lists four Tab stops, all flagged',
+    await evaluate(`document.querySelectorAll('#sim-after .tabpath li.problem').length === 4 && /4 Tab stops/.test(document.getElementById('sim-tally').textContent)`),
+    await evaluate(`document.getElementById('sim-tally').textContent`));
+  await click('#barrier-chips .chip:has(input[value="cognitive"])');
+  await waitFor(`document.querySelectorAll('#sim-after .hard').length > 0`, 'cognitive view');
+  check('cognitive barrier marks hard words', true);
+  await click('#barrier-chips .chip:has(input[value="lowvision"])');
+  await waitFor(`document.getElementById('sim-after').classList.contains('sim-lowvision')`, 'low vision view');
+  check('low vision barrier blurs and enlarges the copy',
+    await evaluate(`getComputedStyle(document.getElementById('sim-after')).filter.includes('blur')`));
+  await click('#barrier-chips .chip:has(input[value="screenreader"])');
+  await evaluate(`(() => { const f = document.getElementById('fix-format'); f.value = 'email'; f.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+  check('email format rewrites the handoff text',
+    await evaluate(`document.getElementById('fix-text').value.startsWith('Subject: 13 small accessibility fixes for Design club build night')`));
+  await click('#fix-copy');
+  await waitFor(`!document.getElementById('fix-status').hidden`, 'copy status');
+  check('copy handoff reports its result',
+    await evaluate(`/Copied|blocked/.test(document.getElementById('fix-status').textContent)`),
+    await evaluate(`document.getElementById('fix-status').textContent`));
+  await evaluate(`window.__dl = []; window.__click = HTMLAnchorElement.prototype.click;
+    HTMLAnchorElement.prototype.click = function () { window.__dl.push({ href: this.href, name: this.download }); };`);
+  await click('#fix-download');
+  await waitFor(`window.__dl.length > 0`, 'handoff download');
+  check('handoff downloads a named Markdown blob',
+    await evaluate(`window.__dl.length === 1 && window.__dl[0].href.startsWith('blob:') && window.__dl[0].name === 'accesslens-handoff-email.md'`));
+  await evaluate(`HTMLAnchorElement.prototype.click = window.__click;`);
+  await evaluate(`(() => { const f = document.getElementById('fix-format'); f.value = 'github'; f.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+  await evaluate(`document.getElementById('handoff').scrollIntoView({ block: 'start' })`);
+  await sleep(300);
+  await capture('handoff.png');
+
+  // WCAG math drawer: live numbers from the shipped functions.
+  await click('#learn-open');
+  await waitFor(`document.getElementById('learn').open`, 'math drawer');
+  check('math drawer shows the #888 on white ratio and the AA fix',
+    await evaluate(`document.getElementById('m-ratio').textContent.endsWith('3.54 : 1') && document.getElementById('m-suggest').textContent.includes('#767676')`),
+    await evaluate(`document.getElementById('m-ratio').textContent`));
+  await evaluate(`(() => { const c = document.getElementById('learn-fg'); c.value = '#767676'; c.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+  check('changing the text color recomputes the verdicts',
+    await evaluate(`document.querySelector('#m-verdicts li').classList.contains('pass')`));
+  check('reading level steps use this document',
+    await evaluate(`document.querySelectorAll('#m-fk li').length === 4 && /grade 9/.test(document.getElementById('m-fk-verdict').textContent)`));
+  await evaluate(`(() => { const r = document.getElementById('t-size'); r.value = '24'; r.dispatchEvent(new Event('input', { bubbles: true })); })()`);
+  check('target size slider reaches the 2.5.8 pass',
+    await evaluate(`document.getElementById('t-verdict').textContent.includes(': pass.')`));
+  for (let i = 0; i < 20; i++) {
+    await cdp.send('Page.captureScreenshot', { format: 'png' }, sid);
+    if (await evaluate(`document.getAnimations().every(a => a.playState === 'finished')`)) break;
+  }
+  await capture('learn.png');
+  await click('#learn-close');
+  await cdp.send('Page.captureScreenshot', { format: 'png' }, sid);
+  check('math drawer closes', await evaluate(`document.getElementById('learn').open === false`));
 
   // Evidence button selects the exact nonempty source range.
   const range = await evaluate(`(() => {
@@ -495,6 +562,24 @@ async function main() {
   const valueAfter = await evaluate(`document.getElementById('document').value`);
   check('mobile example switch loads a different document and clears results',
     valueAfter !== valueBefore && await evaluate(`document.getElementById('repair').disabled === true`));
+  await click('#run');
+  await waitFor(`document.getElementById('handoff-body').hidden === false`, 'mobile handoff');
+  await click('#barrier-chips .chip:has(input[value="cognitive"])');
+  await waitFor(`document.querySelectorAll('#sim-after .hard').length > 0`, 'mobile cognitive view');
+  check('390x844: handoff and Fix Cards stay inside the viewport',
+    await evaluate(`document.documentElement.scrollWidth <= document.documentElement.clientWidth && [...document.querySelectorAll('.fix-card')].every(c => c.getBoundingClientRect().right <= 391)`));
+  await click('#learn-open-2');
+  await waitFor(`document.getElementById('learn').open`, 'mobile drawer');
+  for (let i = 0; i < 20; i++) {
+    await cdp.send('Page.captureScreenshot', { format: 'png' }, sid);
+    if (await evaluate(`document.getAnimations().every(a => a.playState === 'finished')`)) break;
+  }
+  check('390x844: math drawer fits the screen once it settles',
+    await evaluate(`(() => { const r = document.getElementById('learn').getBoundingClientRect(); return r.left >= 0 && r.right <= 391; })()`),
+    await evaluate(`JSON.stringify(document.getElementById('learn').getBoundingClientRect())`));
+  await click('#learn-close');
+  await cdp.send('Page.captureScreenshot', { format: 'png' }, sid);
+  check('390x844: math drawer closes', await evaluate(`document.getElementById('learn').open === false`));
 
   const badMobile = requests.filter(u => u && !u.startsWith(origin) && !u.startsWith('data:') && !u.startsWith('blob:') && !u.startsWith('devtools:'));
   check('no external requests after mobile pass', badMobile.length === 0, badMobile.slice(0, 3).join(', '));

@@ -31,7 +31,7 @@ Strategy: Restrained. Neutral paper and ink with petrol doing the work; acid is 
 
 - Top utility line: brand mark left, section jump links right. The `h1` stands alone; no kicker, no helper line.
 - Desktop: a two-column desk, Source (3fr) beside the Analysis board (2fr), so the readout sits level with the editor it describes.
-- Below the desk: Comparison as two ruled paper columns (Original against Reading copy), then the WCAG 2.2 audit (metric table, two histograms, badge row, signed certificate and its checker), the Study deck, the Self-tests run, then Help as a single `details`.
+- Below the desk: Community fix handoff (barrier chips, an As written paper beside a With the barrier paper that carries an acid offset shadow and an acid tally, then Fix Cards in a responsive grid with a brick, acid or plain priority pill and a petrol, brick or gray left rule), then Comparison as two ruled paper columns (Original against Reading copy), then the WCAG 2.2 audit (metric table, two histograms, badge row, signed certificate and its checker), the Study deck, the Self-tests run, then Help as a single `details`.
 - Mobile (under 920 px): one column; controls wrap; papers stack; histograms go full width; nothing scrolls sideways.
 
 ## Materials
@@ -43,6 +43,8 @@ Strategy: Restrained. Neutral paper and ink with petrol doing the work; acid is 
 
 ## Motion and chrome
 
+- The WCAG math drawer slides in from the right over a dimmed page; it holds stepwise formula blocks in mono on raised paper, with the formula itself on the acid highlighter.
+- Labels and legends are sentence case in bold Verdana; no uppercase micro-labels.
 - One brief reveal on `h1` and the desk, gated behind `prefers-reduced-motion: no-preference`. No other animation, no smooth scrolling.
 - Browser chrome is themed: acid `::selection`, petrol caret, thin petrol scrollbars, petrol `:focus-visible` ring (2.5 px, offset).
 
