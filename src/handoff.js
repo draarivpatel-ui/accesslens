@@ -1,11 +1,11 @@
 // Community fix handoff: turns a report into plain-language Fix Cards that a
 // volunteer can hand to a nonprofit, school or club webmaster, and builds the
 // barrier simulations shown beside the source. Pure functions, no DOM.
-import { RULES, capsDiagnostic } from './a11y.js';
+import { RULES, accessibleName, capsDiagnostic, nameContext } from './a11y.js';
 import { decodeEntities } from './tokenize.js';
 import { common } from './glossary.js';
-import { sentences, syllables, words } from './nlp.js';
-import { COGNITIVE_LOAD_WORDS, READING_LEVEL_MAX_GRADE } from './wcag-audit.js';
+import { COGNITIVE_LOAD_WORDS, sentences, syllables, words } from './nlp.js';
+import { READING_LEVEL_MAX_GRADE } from './wcag-audit.js';
 
 export const WHO = Object.freeze({
   sr: 'Screen reader users',
@@ -225,17 +225,27 @@ export function formatPack(cards, { format = 'github', audience = 'nonprofit', t
 
 // Barrier simulations.
 
-function accessibleName(node) {
-  const a = node.attrs;
-  return (a['aria-label'] || (node.tag === 'img' ? a.alt : '') || node.label || a.title || (node.tag === 'input' ? a.value : '') || '')
-    .replace(/\s+/g, ' ').trim();
+const DISABLABLE = new Set(['button', 'input', 'select', 'textarea', 'fieldset']);
+function isDisabled(node, elements) {
+  if (!DISABLABLE.has(node.tag)) return false;
+  if (Object.hasOwn(node.attrs, 'disabled')) return true;
+  for (let parent = node.parent; parent; parent = parent.parent) {
+    if (parent.tag !== 'fieldset' || !Object.hasOwn(parent.attrs, 'disabled')) continue;
+    const firstLegend = elements.find(element => element.tag === 'legend' && element.parent === parent);
+    let inLegend = false;
+    for (let ancestor = node.parent; ancestor && ancestor !== parent; ancestor = ancestor.parent) {
+      if (ancestor === firstLegend) { inLegend = true; break; }
+    }
+    if (!inLegend) return true;
+  }
+  return false;
 }
 
 const REPLACED = new Set(['iframe', 'select', 'textarea', 'object', 'embed']);
 const visible = node => !node.aria && !node.excluded && (!node.hidden || REPLACED.has(node.tag));
-const FOCUSABLE = node => {
+const FOCUSABLE = (node, elements) => {
   const a = node.attrs;
-  if (!visible(node)) return false;
+  if (!visible(node) || isDisabled(node, elements)) return false;
   if (a.tabindex !== undefined && Number(a.tabindex) < 0) return false;
   if (node.tag === 'a' || node.tag === 'area') return Object.hasOwn(a, 'href');
   if (node.tag === 'input') return (a.type ?? '').toLowerCase() !== 'hidden';
@@ -247,10 +257,13 @@ const issueAt = (report, node) => (report.issues ?? []).find(i => i.start === no
 
 export function keyboardPath(report) {
   if (!report?.parsed) return [];
-  return report.parsed.elements.filter(FOCUSABLE).map((node, i) => {
+  const names = nameContext(report.parsed);
+  const priority = node => Number(node.attrs.tabindex) > 0 ? Number(node.attrs.tabindex) : Infinity;
+  return report.parsed.elements.filter(node => FOCUSABLE(node, report.parsed.elements))
+    .sort((a, b) => priority(a) === priority(b) ? a.start - b.start : priority(a) - priority(b)).map((node, i) => {
     const role = node.tag === 'input' ? (['button', 'submit', 'reset', 'image'].includes((node.attrs.type ?? '').toLowerCase()) ? 'Button' : 'Edit text') : ROLE[node.tag] ?? 'Control';
     const issue = issueAt(report, node);
-    const name = issue && ['input-label', 'button-name', 'frame-title'].includes(issue.id) ? '' : accessibleName(node);
+    const name = accessibleName(node, names);
     return { stop: i + 1, role, name, problem: issue ? issue.label : null, start: node.start };
   });
 }
@@ -260,6 +273,8 @@ export function screenReaderScript(report) {
   const out = [];
   const say = (text, problem = null) => out.push({ text, problem });
   if (report.parsed) {
+    const names = nameContext(report.parsed);
+    const stops = new Map(keyboardPath(report).map(step => [step.start, step]));
     const root = report.parsed.elements.find(n => n.tag === 'html');
     const title = report.parsed.elements.find(n => n.tag === 'title')?.label.trim();
     say(title ? `Page, "${title}"` : 'Page, untitled', title ? null : RULES['page-title'][0]);
@@ -272,14 +287,14 @@ export function screenReaderScript(report) {
     for (const node of report.parsed.elements) {
       if (!visible(node)) continue;
       const issue = issueAt(report, node);
-      const name = accessibleName(node);
+      const name = accessibleName(node, names);
       if (/^h[1-6]$/.test(node.tag)) say(name ? `Heading level ${node.tag[1]}, "${name}"` : `Heading level ${node.tag[1]}, empty`, issue?.label ?? null);
       else if (node.tag === 'img') {
         if (node.attrs.alt === '') continue;
         const file = (node.attrs.src ?? '').split('/').pop();
         say(name ? `Image, "${name}"` : `Image${file ? `, "${file}"` : ', unlabeled'}`, issue?.label ?? null);
-      } else if (FOCUSABLE(node)) {
-        const step = keyboardPath({ ...report, parsed: { elements: [node] } })[0];
+      } else if (stops.has(node.start)) {
+        const step = stops.get(node.start);
         say(step.name ? `${step.role}, "${step.name}"` : `${step.role}, unlabeled`, issue?.label ?? (step.name ? null : 'No accessible name'));
       } else if (['p', 'li'].includes(node.tag) && (ownText.get(node) ?? '').trim()) {
         const text = ownText.get(node).replace(/\s+/g, ' ').trim();

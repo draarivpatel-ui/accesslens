@@ -2,12 +2,12 @@
 // deterministic estimate computed in the tab; the badges are signals drawn
 // from published thresholds, not WCAG conformance decisions.
 import { contrastRatio } from './a11y.js';
-import { sentences, syllables, words } from './nlp.js';
+import { COGNITIVE_LOAD_WORDS, sentences, syllables, words } from './nlp.js';
+export { COGNITIVE_LOAD_WORDS } from './nlp.js';
 
 // Palette of the generated reading copy (see PAPER_CSS in remediate.js).
 export const COPY_THEME = Object.freeze({ ink: '#14232b', background: '#fffdf4' });
 
-export const COGNITIVE_LOAD_WORDS = 25;      // sentences strictly over 25 words are flagged
 export const READING_LEVEL_MAX_GRADE = 9;    // lower-secondary bound used for the 3.1.5 signal
 export const CONTRAST_AA = 4.5;
 export const CONTRAST_AA_LARGE = 3;

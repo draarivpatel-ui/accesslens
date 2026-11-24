@@ -5,7 +5,7 @@ import { presets } from '../src/presets.js';
 import { inspectDocument } from '../src/remediate.js';
 import { AUDIENCES, BARRIERS, EFFORT, FIXES, FORMATS, WHO, buildFixCards, cognitiveView, documentTitle,
   formatPack, keyboardPath, packSummary, screenReaderScript } from '../src/handoff.js';
-import { COGNITIVE_LOAD_WORDS } from '../src/wcag-audit.js';
+import { COGNITIVE_LOAD_WORDS, compareReports, sentenceHistogram } from '../src/wcag-audit.js';
 
 const report = id => { const p = presets.find(x => x.id === id); return inspectDocument(p.source, p.mode); };
 const html = body => inspectDocument(`<!doctype html><html lang="en"><head><title>T</title></head><body>${body}</body></html>`, 'html');
@@ -167,6 +167,69 @@ test('keyboardPath skips hidden, negative tabindex and hidden inputs', () => {
   assert.deepEqual(stops.map(s => s.name), ['Home', 'Send RSVP']);
   assert.ok(stops.every(s => !s.problem));
 });
+
+const NAMED_CONTROLS = [
+  ['associated label', '<label for="email">Email address</label><input id="email" type="email">', 'Edit text', 'Email address'],
+  ['enclosing label', '<label>Phone number <input type="tel"></label>', 'Edit text', 'Phone number'],
+  ['multiple referenced labels', '<span id="send">Send</span><span id="message">message</span><button aria-labelledby="send message"></button>', 'Button', 'Send message'],
+  ['hidden referenced text', '<span id="send" hidden>Send message</span><button aria-labelledby="send"></button>', 'Button', 'Send message'],
+  ['referenced image alternative', '<span id="send"><img src="send.svg" alt="Send message"></span><button aria-labelledby="send"></button>', 'Button', 'Send message'],
+  ['referenced label before aria-label', '<span id="send">Send message</span><button aria-labelledby="send" aria-label="Other"></button>', 'Button', 'Send message'],
+];
+for (const [kind, source, role, name] of NAMED_CONTROLS) {
+  test('handoff resolves ' + kind + ' consistently with the audit', () => {
+    const r = html(source);
+    assert.ok(!r.issues.some(issue => ['input-label', 'button-name'].includes(issue.id)));
+    assert.deepEqual(keyboardPath(r).map(step => step.name), [name]);
+    const line = screenReaderScript(r).find(line => line.text === role + ', "' + name + '"');
+    assert.ok(line, 'screen reader must announce the valid name');
+    assert.equal(line.problem, null);
+    assert.ok(!screenReaderScript(r).some(line => line.problem === 'No accessible name' || line.text.endsWith(', unlabeled')));
+  });
+}
+
+test('keyboardPath excludes disabled native controls', () => {
+  const r = html('<button disabled>Unavailable</button><input disabled aria-label="Unavailable field">' +
+    '<select disabled aria-label="Unavailable choices"><option>A</option></select>' +
+    '<textarea disabled aria-label="Unavailable notes"></textarea><button>Available</button>');
+  assert.deepEqual(keyboardPath(r).map(step => step.name), ['Available']);
+});
+
+test('keyboardPath exempts only the first legend of a disabled fieldset', () => {
+  const r = html('<fieldset disabled><legend>Contact <input aria-label="Legend field"></legend>' +
+    '<button>Disabled child</button><legend>Later <input aria-label="Later legend field"></legend></fieldset>' +
+    '<button>Available</button>');
+  assert.deepEqual(keyboardPath(r).map(step => step.name), ['Legend field', 'Available']);
+});
+
+test('keyboardPath checks every disabled fieldset ancestor and keeps noncontrols focusable', () => {
+  const r = html('<fieldset disabled><legend>Outer <button>Outer legend</button>' +
+    '<fieldset disabled><legend>Inner <button>Both legends</button></legend><button>Inner blocked</button></fieldset>' +
+    '</legend><button>Outer blocked</button><a href="/link" disabled>Link</a></fieldset>');
+  assert.deepEqual(keyboardPath(r).map(step => step.name), ['Outer legend', 'Both legends', 'Link']);
+});
+
+test('keyboardPath orders positive tabindex before natural and zero order with stable ties', () => {
+  const r = html('<button>Natural</button><button tabindex="2">Second</button><button tabindex="1">First</button>' +
+    '<button tabindex="1">First tie</button><div tabindex="2" aria-label="Second tie"></div>' +
+    '<button tabindex="0">Zero</button><a href="/">Home</a><button tabindex="-1">Skip</button>');
+  const path = keyboardPath(r);
+  assert.deepEqual(path.map(step => step.name), ['First', 'First tie', 'Second', 'Second tie', 'Natural', 'Zero', 'Home']);
+  assert.deepEqual(path.map(step => step.stop), [1, 2, 3, 4, 5, 6, 7]);
+});
+
+for (const count of [24, 25, 26]) {
+  test(count + ' words get the same cognitive-load verdict in analysis, histogram, badge and Fix Cards', () => {
+    const text = Array(count).fill('word').join(' ') + '.';
+    const r = inspectDocument(text, 'text');
+    const overLimit = count > 25;
+    assert.equal(r.stats.long.length, Number(overLimit));
+    assert.equal(sentenceHistogram(text).overLimit, Number(overLimit));
+    assert.equal(compareReports(r).badges.find(badge => badge.id === 'load').before, !overLimit);
+    assert.equal(buildFixCards(r).some(card => card.id === 'long-sentence'), overLimit);
+    assert.equal(cognitiveView(r.blocks).reduce((sum, block) => sum + block.faded, 0), Math.max(0, count - 25));
+  });
+}
 
 test('keyboardPath is empty for plain text', () => assert.deepEqual(keyboardPath(report('biology')), []));
 

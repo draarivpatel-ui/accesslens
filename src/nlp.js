@@ -3,6 +3,7 @@ import { acronyms, common, jargon } from './glossary.js';
 export const DAMPING = 0.85;
 export const TOLERANCE = 1e-6;
 export const MAX_SENTENCES = 400;
+export const COGNITIVE_LOAD_WORDS = 25;
 const STOP = new Set('a an and are as at be but by can for from had has have he her in is it its of on or our she that the their them then they this to was we were will with you your'.split(' '));
 const ABBR_ALWAYS = new Set('mr. mrs. ms. dr. prof. vs. jr. sr. mt. rev. hon. gen. col. capt. lt. sgt. fr. br. cf. pres. rep. sen. gov. esq. e.g. i.e. ph.d. m.d. b.a. m.a. b.s. m.s. j.d. r.n. p.s.'.split(' '));
 const ABBR = new Set('st. u.s. u.k. u.n. d.c. a.m. p.m. no. etc. fig. eq. approx. est. sec. ch. pt. ex. ca. p. pp. vol. dept. univ. inc. ed. eds. al. jan. feb. apr. jun. jul. aug. sep. sept. oct. nov. dec. mon. tue. tues. thu. thur. thurs. fri. min. max. avg. misc. dist. asst. supt. assoc. bros. co. corp. ltd.'.split(' '));
@@ -191,6 +192,6 @@ export function analyzeText(text) {
   const segments = sentences(text);
   return {
     ...readability(text, segments), ...rankSentences(segments), terms: detectTerms(text), passive: detectPassive(text),
-    long: segments.filter(s => words(s.text).length > 24).map(s => ({ ...s, split: splitLongSentence(s.text) }))
+    long: segments.filter(s => words(s.text).length > COGNITIVE_LOAD_WORDS).map(s => ({ ...s, split: splitLongSentence(s.text) }))
   };
 }

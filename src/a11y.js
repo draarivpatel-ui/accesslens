@@ -76,6 +76,61 @@ function within(node, tag) {
   return null;
 }
 
+// Shared name context for the audit and the handoff simulations. Referenced
+// text may be hidden, and includes nested text and image alternatives.
+export function nameContext(parsed) {
+  const ids = new Map();
+  const idOwners = new Map();
+  const labels = new Map();
+  for (const node of parsed.elements) {
+    if (node.attrs.id && !ids.has(node.attrs.id)) {
+      ids.set(node.attrs.id, node.label);
+      idOwners.set(node.attrs.id, node);
+    }
+    if (node.tag === 'label' && node.attrs.for && !node.hidden && node.label.trim()) {
+      labels.set(node.attrs.for, node.label);
+    }
+  }
+  for (const event of parsed.events ?? []) {
+    if (event.type === 'text') {
+      const text = decodeEntities(event.value);
+      for (let node = event.node; node; node = node.parent) {
+        if (node.attrs.id && !node.label && text.trim() && node === idOwners.get(node.attrs.id) && !event.aria && (!event.hidden || node.hidden)) {
+          ids.set(node.attrs.id, (ids.get(node.attrs.id) ?? '') + text);
+        }
+      }
+    } else if (event.type === 'alt') {
+      for (let node = event.node; node; node = node.parent) {
+        if (node.attrs.id && !node.label && event.value.trim() && node === idOwners.get(node.attrs.id) && !event.aria) {
+          ids.set(node.attrs.id, ((ids.get(node.attrs.id) ?? '') + ' ' + event.value).trim());
+        }
+      }
+    }
+  }
+  return { ids, labels };
+}
+
+export function accessibleName(node, { ids, labels }) {
+  const a = node.attrs;
+  const normalize = value => (value ?? '').replace(/\s+/g, ' ').trim();
+  const referenced = normalize((a['aria-labelledby'] ?? '').trim().split(/\s+/).map(id => ids.get(id) ?? '').join(' '));
+  if (referenced) return referenced;
+  if (normalize(a['aria-label'])) return normalize(a['aria-label']);
+  if (['input', 'button', 'select', 'textarea'].includes(node.tag)) {
+    const label = within(node, 'label');
+    const labeled = normalize(labels.get(a.id)) || (label && !label.attrs.for ? normalize(label.label) : '');
+    if (labeled) return labeled;
+  }
+  let native = ['img', 'area'].includes(node.tag) ? a.alt : '';
+  if (node.tag === 'input') {
+    const kind = (a.type ?? '').trim().toLowerCase();
+    if (['button', 'submit', 'reset', 'image'].includes(kind)) {
+      native = kind === 'image' ? a.alt : a.value ?? (kind === 'button' ? '' : kind);
+    }
+  }
+  return normalize(native) || normalize(node.label) || normalize(a.title);
+}
+
 function validLanguage(text) {
   if (!text?.trim()) return false;
   try { return new Intl.Locale(text.trim()).language !== 'und'; }
@@ -104,17 +159,8 @@ export function auditHTML(source, parsed = tokenizeHTML(source)) {
     add('page-title', 'Give the document a non-empty title in its head.', title ?? root ?? parsed.doctype);
   }
 
-  const ids = new Map();
-  const idOwners = new Map();
-  const labels = new Map();
+  const { ids, labels } = nameContext(parsed);
   const ownText = new Map();
-  for (const node of parsed.elements) {
-    if (node.attrs.id && !ids.has(node.attrs.id)) {
-      ids.set(node.attrs.id, node.label);
-      idOwners.set(node.attrs.id, node);
-    }
-    if (node.tag === 'label' && node.attrs.for && !node.hidden && node.label.trim()) labels.set(node.attrs.for, true);
-  }
   const CAPS_TAGS = /^(?:p|div|section|article|li|h[1-6])$/;
   const subtree = new Map();
   for (const event of parsed.events) {
@@ -123,17 +169,6 @@ export function auditHTML(source, parsed = tokenizeHTML(source)) {
       if (event.node && text.trim() && !event.hidden) {
         ownText.set(event.node, (ownText.get(event.node) ?? '') + text);
         for (let n = event.node; n; n = n.parent) if (CAPS_TAGS.test(n.tag)) subtree.set(n, (subtree.get(n) ?? '') + text);
-      }
-      for (let node = event.node; node; node = node.parent) {
-        if (node.attrs.id && !node.label && text.trim() && node === idOwners.get(node.attrs.id) && !event.aria && (!event.hidden || node.hidden)) {
-          ids.set(node.attrs.id, (ids.get(node.attrs.id) ?? '') + text);
-        }
-      }
-    } else if (event.type === 'alt') {
-      for (let node = event.node; node; node = node.parent) {
-        if (node.attrs.id && !node.label && event.value.trim() && node === idOwners.get(node.attrs.id) && !event.aria) {
-          ids.set(node.attrs.id, ((ids.get(node.attrs.id) ?? '') + ' ' + event.value).trim());
-        }
       }
     }
   }
