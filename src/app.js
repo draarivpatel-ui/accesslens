@@ -301,7 +301,7 @@ function renderLanguageEvidence(stats) {
   const host = $('language-evidence');
   host.replaceChildren();
   const sections = [
-    ['Key points', stats.ranked, 3, item => `TextRank ${item.score}`],
+    ['Key points', stats.ranked, 3, item => `TextRank ${Number(item.score).toFixed(3)}`],
     ['Acronyms and jargon', stats.terms, 20, item => item.explanation ?? 'Needs an expansion from the author.'],
     ['Passive voice signals', stats.passive, 20, () => 'Review who performs the action.'],
     ['Long sentences', stats.long, 20, item => item.split?.join(' ') ?? 'No conservative split suggested.']

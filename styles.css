@@ -79,6 +79,9 @@ body {
 .brand-name { font-family: var(--serif); font-size: 1.05rem; letter-spacing: 0.01em; }
 .utility nav { display: flex; gap: 1.15rem; flex-wrap: wrap; }
 .utility a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.5rem;
   color: var(--petrol);
   text-decoration: none;
   font-size: 0.78rem;
@@ -785,4 +788,39 @@ footer p { font-size: 0.8rem; color: var(--muted); margin: 0; }
   .target-controls { grid-template-columns: minmax(0, 1fr); }
   .utility { padding-inline: 1rem; }
   main { padding-inline: 1rem; }
+}
+
+/* Print: the analyzed desk on white stock, without the controls that cannot act on paper. */
+@media print {
+  :root {
+    --paper: #fff;
+    --paper-raised: #fff;
+    --ink: #000;
+    --petrol: #000;
+    --muted: #333;
+    --line: #bbb;
+    --line-strong: #777;
+    --acid: #eee;
+  }
+  html, body { background: #fff; color: #000; }
+  body { font-size: 10.5pt; line-height: 1.45; }
+  main { max-width: none; padding: 0; }
+  h1 { font-size: 20pt; margin: 0 0 6pt; }
+  h2 { font-size: 13pt; }
+  a { color: #000; text-decoration: none; }
+  .skip, .utility, #source, .controls, .examples, .mode-field, #document, .hint, .exports,
+  .fix-tools, .deck-controls, .rate, .certificate .field, #verify, #verify-result,
+  #selftests-run, .section-head .ghost, #learn, .drawer, .chips, #profile, #barrier,
+  .check, .notes, footer { display: none !important; }
+  button, input, select, textarea { display: none !important; }
+  .idle, .fix-preview summary, .certificate, .hists figure:has(.idle) { display: none !important; }
+  #comparison:has(#after .idle), #selftests:not(:has(#selftests-list li)) { display: none !important; }
+  .desk { display: block; }
+  .paper, .sim-pane, .fix-card, .certificate, .readout-wrap { break-inside: avoid; }
+  thead { display: table-header-group; }
+  tr, li { break-inside: avoid; }
+  .sim-barrier { box-shadow: none; }
+  .wcag-scroll, .sim-body, .fix-preview textarea { overflow: visible; max-height: none; }
+  [hidden] { display: none !important; }
+  #handoff-body[hidden], #deck[hidden], #wcag-audit[hidden] { display: none !important; }
 }
