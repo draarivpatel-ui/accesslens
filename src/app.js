@@ -8,7 +8,7 @@ import { AUDIENCES, BARRIERS, FORMATS, buildFixCards, cognitiveView, documentTit
   packSummary, screenReaderScript } from './handoff.js';
 import { contrastMath, fleschKincaidMath, spacingMath, suggestForeground, targetSize } from './learn.js';
 import {
-  COPY_THEME, DYSLEXIA_SPACING, compareReports, encodeLensHash, histogramGeometry,
+  COPY_THEME, DYSLEXIA_SPACING, codePointSlice, compareReports, encodeLensHash, histogramGeometry,
   parseLensHash, semanticSummary, semanticTree, textSpacingAudit, wcagContrast
 } from './wcag-audit.js';
 
@@ -274,7 +274,7 @@ function showEvidence(start, end) {
 function evidenceButton(start, end, label) {
   const btn = el('button', 'evidence', 'Show in source');
   btn.type = 'button';
-  if (label) btn.setAttribute('aria-label', `Show in source: ${String(label).slice(0, 90)}`);
+  if (label) btn.setAttribute('aria-label', `Show in source: ${codePointSlice(label, 90)}`);
   btn.addEventListener('click', () => showEvidence(start, end));
   return btn;
 }
@@ -584,7 +584,7 @@ function renderCard() {
   deckCountEl.textContent = `Card ${state.card + 1} of ${cards.length}`;
   deckKindEl.textContent = card.kind ? String(card.kind) : 'card';
   deckOffsetEl.textContent = `${card.sourceStart}..${card.sourceEnd}`;
-  deckEvidenceEl.setAttribute('aria-label', `Show in source: ${String(card.front).slice(0, 90)}`);
+  deckEvidenceEl.setAttribute('aria-label', `Show in source: ${codePointSlice(card.front, 90)}`);
   deckEvidenceEl.onclick = () => showEvidence(card.sourceStart, card.sourceEnd);
   cardPrevEl.disabled = state.card === 0;
   cardNextEl.disabled = state.card === cards.length - 1;

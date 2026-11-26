@@ -8,6 +8,10 @@ export { COGNITIVE_LOAD_WORDS } from './nlp.js';
 // Palette of the generated reading copy (see PAPER_CSS in remediate.js).
 export const COPY_THEME = Object.freeze({ ink: '#14232b', background: '#fffdf4' });
 
+// Slice user-visible text by Unicode code points so an astral emoji can never
+// be split into a lone UTF-16 surrogate.
+export const codePointSlice = (value, max) => Array.from(String(value)).slice(0, max).join('');
+
 export const READING_LEVEL_MAX_GRADE = 9;    // lower-secondary bound used for the 3.1.5 signal
 export const CONTRAST_AA = 4.5;
 export const CONTRAST_AA_LARGE = 3;

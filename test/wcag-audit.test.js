@@ -12,7 +12,7 @@ import { runSelfTests, selfTests } from '../src/selftest.js';
 import { sha256bytes, sha256hex } from '../src/sha256.js';
 import {
   COGNITIVE_LOAD_WORDS, COPY_THEME, DYSLEXIA_SPACING, HISTOGRAM_BINS, READING_LEVEL_MAX_GRADE,
-  SPACING_MIN, compareReports, encodeLensHash, fogFromStats, gunningFog, histogramGeometry,
+  SPACING_MIN, codePointSlice, compareReports, encodeLensHash, fogFromStats, gunningFog, histogramGeometry,
   histogramSVG, jargonShare, longWordShare, parseLensHash, readingLevelPass, readingLevelSummary,
   semanticSummary, semanticTree, sentenceHistogram, textSpacingAudit, wcagContrast
 } from '../src/wcag-audit.js';
@@ -658,4 +658,12 @@ test('csv escapes still guard the certificate sheet', () => {
 });
 test('contrast ratio still matches the audit module', () => {
   assert.equal(contrastRatio('#000', '#fff'), wcagContrast('#000', '#fff').ratio);
+});
+
+test('codePointSlice never splits an emoji surrogate pair', () => {
+  const emoji = '\uD83D\uDD0E';
+  const sliced = codePointSlice(emoji.repeat(100), 90);
+  assert.equal(sliced, emoji.repeat(90));
+  assert.equal(Array.from(sliced).length, 90);
+  assert.equal(/[\uD800-\uDBFF]$/.test(sliced), false);
 });
