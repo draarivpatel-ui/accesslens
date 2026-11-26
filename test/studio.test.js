@@ -269,3 +269,14 @@ test('shortcut guard covers ARIA text-entry and menu roles', () => {
     assert.equal(shortcutAction(event, true), null, role);
   }
 });
+
+test('print and touch accessibility regressions stay pinned', async () => {
+  const css = await readFile(new URL('../styles.css', import.meta.url), 'utf8');
+  assert.match(css, /input::placeholder, textarea::placeholder \{ color: var\(--muted\); opacity: 1; \}/);
+  assert.match(css, /\.skip \{[^}]*min-height: 2\.75rem/s);
+  assert.match(css, /\.utility a \{[^}]*min-height: 2\.75rem/s);
+  assert.match(css, /\.check \{[^}]*min-height: 2\.75rem/s);
+  assert.match(css, /\.chip \{[^}]*min-height: 2\.75rem/s);
+  assert.match(css, /@page \{ margin: 12mm; \}/);
+  assert.match(css, /\.sim-cognitive \.fade \{ opacity: 0\.65; \}/);
+});
